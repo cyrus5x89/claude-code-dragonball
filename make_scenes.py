@@ -1,7 +1,6 @@
 # hooks/scenes.ts: cảnh nền Claude Dragonball cho app desktop (mod), một cảnh gốc + một cảnh mỗi mức effort
 # python3 make_scenes.py
-import base64, io, json, math, pathlib
-from PIL import Image
+import json, math, pathlib, re, subprocess, tempfile
 
 HERE = pathlib.Path(__file__).parent
 LEVELS = ["low", "medium", "high", "xhigh", "max", "ultracode"]
@@ -25,18 +24,31 @@ def balls():
 
 
 def mascot(level):
-    # nền tối của ảnh thành trong suốt (độ sáng thấp → alpha thấp) để hoà vào hào quang phía sau
-    im = Image.open(HERE / f"art/mascot/claude-{level}.png").convert("RGB").resize((340, 340), Image.LANCZOS)
-    alpha = im.convert("L").point(lambda v: 0 if v < 24 else min(255, (v - 24) * 6))
-    im.putalpha(alpha)
-    buf = io.BytesIO()
-    im.save(buf, "WEBP", quality=70)
-    return "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode()
+    # app không nhận ảnh nhúng trong nền (chỉ vector), nên vẽ lại mascot thành path bằng vtracer, bỏ các mảng nền tối
+    with tempfile.TemporaryDirectory() as tmp:
+        out = pathlib.Path(tmp, "m.svg")
+        subprocess.run(["uv", "run", "--quiet", "--python", "3.12", "--with", "vtracer", "--with", "pillow", "python", "-c",
+                        "import sys,vtracer;from PIL import Image;Image.open(sys.argv[1]).convert('RGB').resize((256,256)).save(sys.argv[2]+'.png');"
+                        "vtracer.convert_image_to_svg_py(sys.argv[2]+'.png',sys.argv[2],colormode='color',hierarchical='stacked',mode='spline',"
+                        "filter_speckle=6,color_precision=5,layer_difference=24,corner_threshold=60,length_threshold=4.0,splice_threshold=45,path_precision=1)",
+                        str(HERE / f"art/mascot/claude-{level}.png"), str(out)], check=True)
+        paths = re.findall(r"<path[^>]*/>", out.read_text())
+
+    def dark(p):
+        # mảng nền: tối và phủ gần hết khung (giữ lại mắt, viền nhỏ)
+        c = re.search(r'fill="#([0-9A-Fa-f]{6})"', p)
+        if c is None or sum(int(c.group(1)[i:i + 2], 16) for i in (0, 2, 4)) >= 3 * 40:
+            return False
+        nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", re.search(r'd="([^"]*)"', p).group(1))]
+        xs, ys = nums[0::2], nums[1::2]
+        return max(xs) - min(xs) > 150 or max(ys) - min(ys) > 150
+
+    return "".join(p for p in paths[1:] if not dark(p))  # path đầu của chế độ stacked là cả khung nền
 
 
 def scene(level=None):
     color = AURA.get(level, "#D97757")
-    body = (f'<image href="{mascot(level)}" x="1150" y="640" width="340" height="340" opacity=".45"/>' if level else
+    body = (f'<svg x="1150" y="640" width="340" height="340" viewBox="0 0 256 256" opacity=".45">{mascot(level)}</svg>' if level else
             '<text x="1330" y="850" font-size="120" text-anchor="middle" fill="#D97757" opacity=".18">✳</text>')
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">'
             f'<style>{CSS} {STILL}</style><defs>'
