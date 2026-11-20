@@ -38,6 +38,8 @@ const ALT: Record<string, string> = {
 const FPS_KEY = 'fps'
 // con pet ở mép phải (mặc định, chưởng bắn sang trái) hay mép trái (lật lại, chưởng bắn sang phải)
 const SIDE_KEY = 'side'
+// /dragonball app off: tắt nền và con pet trên app desktop của máy này, CLI vẫn chạy
+const APP_KEY = 'app'
 const DEFAULT_FPS = 24
 
 async function fpsOf($: { store: { get(key: string): Promise<unknown> } }): Promise<number> {
@@ -88,8 +90,8 @@ async function clearScene($: AnyEngine): Promise<void> {
 
 // Nền chỉ có trên app desktop. Một phiên CLI (terminal) cũng chạy plugin này: nếu nó đặt cảnh, nền của app đổi theo
 // effort của phiên CLI. Nên chỉ phiên đang vẽ trên app mới đặt cảnh; dáng con pet là của riêng từng phiên, chạy ở cả hai.
-async function inApp($: { session: { surfaces(): Promise<readonly string[]> } }): Promise<boolean> {
-  return (await $.session.surfaces()).includes('desktop')
+async function inApp($: { session: { surfaces(): Promise<readonly string[]> }; store: { get(key: string): Promise<unknown> } }): Promise<boolean> {
+  return (await $.session.surfaces()).includes('desktop') && (await $.store.get(APP_KEY)) !== 'off'
 }
 
 // con pet CLI: cỡ ô (cột x hàng) theo đúng tỉ lệ ảnh (ô chữ iTerm2 cao ~2.8 lần rộng) để ảnh lấp kín ô, chân con Claude
@@ -161,7 +163,7 @@ export const register: Register = on => {
   // cửa sổ app gắn vào phiên sau khi phiên đã chạy: đặt cảnh lúc đó
   on('session.attach', { surface: 'desktop' }, async ($, e, next) => {
     const mode = await $.store.get(MODE_KEY)
-    if (mode !== 'off') {
+    if (mode !== 'off' && (await $.store.get(APP_KEY)) !== 'off') {
       shown = undefined
       try {
         await setScene($, sceneFor(mode))
@@ -247,6 +249,7 @@ export const register: Register = on => {
         </Box>
       )
     }
+    if ((await $.store.get(APP_KEY)) === 'off') return next(e)
     const { Box, Svg } = $.ui.resolve(e)
     // app tự bọc dải này trong một thẻ xám rộng bằng ô chat và cắt phần tràn ra ngoài (lề âm hay khung hẹp đều bị cắt), nên giữ khung đầy đủ, dồn phải
     return (
@@ -269,13 +272,19 @@ export const register: Register = on => {
       await $.store.set(SIDE_KEY, word)
       return { text: `Pet on the ${word}; it moves on the next turn.` }
     }
+    if (word === 'app off' || word === 'app on') {
+      if (word === 'app off' && await inApp($)) await clearScene($)
+      if (word === 'app off') await $.store.set(APP_KEY, 'off')
+      else await $.store.delete(APP_KEY)
+      return { text: word === 'app off' ? 'Desktop app: backdrop and pet off on this machine; the CLI pet stays. /dragonball app on brings them back.' : 'Desktop app: backdrop and pet back on.' }
+    }
     if (word === 'off') {
       await $.store.set(MODE_KEY, 'off')
       if (await inApp($)) await clearScene($)
       return { text: 'Dragon-ball backdrop off. /dragonball turns it back on.' }
     }
     if (word !== '' && !LEVELS.includes(word)) {
-      return { text: `Unknown "${word}". Use off, left, right, fps 12|24|60, nothing, or one of: ${LEVELS.join(', ')}.` }
+      return { text: `Unknown "${word}". Use off, left, right, app off|on, fps 12|24|60, nothing, or one of: ${LEVELS.join(', ')}.` }
     }
     if (word === '') await $.store.delete(MODE_KEY)
     else await $.store.set(MODE_KEY, word)
@@ -287,7 +296,7 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Backdrop' }, async ($, e, next) => {
-    if (e.props.plugin !== PLUGIN || e.surface !== 'desktop') return next(e)
+    if (e.props.plugin !== PLUGIN || e.surface !== 'desktop' || (await $.store.get(APP_KEY)) === 'off') return next(e)
     const props = e.props as { scene?: unknown; id?: unknown }
     const name = typeof props.scene === 'string' ? props.scene : typeof props.id === 'string' ? props.id : undefined
     const source = name === undefined ? undefined : SCENES[name]

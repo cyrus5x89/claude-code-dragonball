@@ -27,6 +27,7 @@ Then send any message: the backdrop and the pet appear with the first turn.
 - `/dragonball` follows the effort level (default)
 - `/dragonball max` pins one level (`low`, `medium`, `high`, `xhigh`, `max`, `ultracode`)
 - `/dragonball off` turns the backdrop and the pet off
+- `/dragonball app off` / `app on`: turn the desktop-app backdrop and pet off on this machine and keep the CLI pet
 - `/dragonball left` / `right` (default): which edge the pet sits on, in the app and the CLI; on the left it faces right and fires the Kamehameha rightward
 - `/dragonball fps 12`, `24` (default) or `60`: frame rate of every animation; lower costs less GPU
 
