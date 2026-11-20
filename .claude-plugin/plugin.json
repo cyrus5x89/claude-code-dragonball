@@ -1,6 +1,9 @@
 {
   "name": "dragonball",
-  "description": "Claude Dragonball theme for Claude Code (CLI and desktop app): black + Claude orange, dragon-ball accents, power-up spinner verbs",
-  "version": "0.1.0",
-  "author": { "name": "cyrus5x89" }
+  "description": "Claude Dragonball for Claude Code: terminal colour theme, and in the desktop app a black backdrop with seven dragon balls and Claude powering up with the effort level",
+  "version": "0.2.0",
+  "author": {
+    "name": "cyrus5x89"
+  },
+  "license": "MIT"
 }
