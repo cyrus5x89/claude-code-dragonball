@@ -25,7 +25,7 @@ def balls():
     return "".join(out)
 
 
-def mascot(level):
+def _mascot(level):
     # app không nhận ảnh nhúng trong nền (chỉ vector), nên vẽ lại mascot thành path bằng vtracer, bỏ các mảng nền tối
     with tempfile.TemporaryDirectory() as tmp:
         out = pathlib.Path(tmp, "m.svg")
@@ -48,6 +48,15 @@ def mascot(level):
     return "".join(p for p in paths[1:] if not dark(p))  # path đầu của chế độ stacked là cả khung nền
 
 
+_PATHS = {}
+
+
+def mascot(level):
+    if level not in _PATHS:
+        _PATHS[level] = _mascot(level)
+    return _PATHS[level]
+
+
 def scene(level=None):
     color = AURA.get(level, "#D97757")
     body = (f'<svg x="1150" y="640" width="340" height="340" viewBox="0 0 256 256" opacity=".45">{mascot(level)}</svg>' if level else
@@ -63,6 +72,9 @@ def scene(level=None):
 scenes = {"dragonball": scene(), **{f"dragonball-{lv}": scene(lv) for lv in LEVELS}}
 for k, v in scenes.items():
     assert len(v) < 131072, (k, len(v))
-(HERE / "hooks/scenes.ts").write_text("// Sinh bởi make_scenes.py, đừng sửa tay\nexport const SCENES: Record<string, string> = "
-                                      + json.dumps(scenes) + "\n")
+(HERE / "hooks/scenes.ts").write_text("// Sinh bởi make_scenes.py, đừng sửa tay\n"
+                                      "// SCENES: cảnh nền app; MASCOTS: path vector của Claude mỗi mức (viewBox 0 0 256 256), cho con pet cạnh ô chat\n"
+                                      "export const SCENES: Record<string, string> = " + json.dumps(scenes) + "\n"
+                                      "export const MASCOTS: Record<string, string> = " + json.dumps({lv: mascot(lv) for lv in LEVELS}) + "\n"
+                                      "export const AURA: Record<string, string> = " + json.dumps(AURA) + "\n")
 print({k: len(v) for k, v in scenes.items()})

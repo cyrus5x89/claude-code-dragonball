@@ -1,8 +1,11 @@
 // Claude Dragonball cho app desktop: cảnh nền đen, 7 viên ngọc rồng, Claude biến hình theo mức effort của lượt.
 // /dragonball: bật lại theo effort · /dragonball <low|medium|high|xhigh|max|ultracode>: giữ một mức · /dragonball off: tắt.
 // Cách đặt nền theo plugin mẫu theme-examples của Anthropic: thử theme.set (mới) rồi ui.backdrop (cũ), engine thiếu thì thôi.
+import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
+import { petSvg } from './pet'
+import type { Pose } from '../types'
 import { SCENES } from './scenes'
 
 const PLUGIN = 'dragonball'
@@ -17,6 +20,13 @@ type AnyEngine = {
   theme?: { set(args: unknown): Promise<Answer>; clear(): Promise<unknown> }
   ui: { toast(text: string): Promise<unknown>; backdrop?(args: unknown): Promise<Answer> }
 }
+
+// con pet cạnh ô chat: dáng (nghỉ / gồng ki / bắn chưởng) và mức effort để chọn con Claude nào
+const pose = atom({ plugin: 'dragonball', key: 'pose' } as const, 'idle' as Pose)
+const level = atom({ plugin: 'dragonball', key: 'level' } as const, 'low')
+// công cụ ghi file: xong một cái là bắn chưởng
+const WRITES = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit']
+const BLAST_MS = 1700
 
 // cảnh đang hiện; biến của module, nạp lại thì đặt lại từ đầu
 let shown: string | undefined
@@ -83,6 +93,7 @@ export const register: Register = on => {
 
   // đầu mỗi lượt đặt lại cảnh: app bỏ qua cảnh đặt trước khi cửa sổ gắn vào phiên (phiên mới, sau /clear)
   on('prompt.submit', async ($, e, next) => {
+    await update($, pose, () => 'charge')
     const mode = await $.store.get(MODE_KEY)
     if (mode !== 'off') {
       shown = undefined
@@ -97,6 +108,7 @@ export const register: Register = on => {
 
   // mỗi lần gửi model một yêu cầu: đổi cảnh theo effort của lượt, trừ khi đã tắt hoặc giữ một mức
   on('turn.step', async function* ($, e, next) {
+    if (typeof e.effort === 'string') await update($, level, () => e.effort as string)
     const mode = await $.store.get(MODE_KEY)
     if (mode === undefined) {
       try {
@@ -106,6 +118,32 @@ export const register: Register = on => {
       }
     }
     return yield* next(e)
+  })
+
+  on('tool.call', async ($, e, next) => {
+    const result = await next(e)
+    if (WRITES.includes(e.tool)) {
+      await update($, pose, () => 'blast')
+      void (async () => {
+        await $.clock.sleep(BLAST_MS)
+        await update($, pose, was => (was === 'blast' ? 'charge' : was))
+      })()
+    }
+    return result
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    await update($, pose, () => 'idle')
+    return next(e)
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.surface !== 'desktop' || e.props.hasSurvey) return next(e)
+    const mode = await $.store.get(MODE_KEY)
+    const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
+    const { Svg } = $.ui.resolve(e)
+    const now = await read($, pose)
+    return <Svg isInteractive key={now} alt={`Claude ${now === 'idle' ? 'resting' : now === 'charge' ? 'charging ki' : 'firing a beam'}`} source={petSvg(shownLevel, now)} />
   })
 
   on('command.run', { command: COMMAND }, async ($, e) => {
