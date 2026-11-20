@@ -26,6 +26,7 @@ In the Claude desktop app (Code tab) the plugin is a mod, built like Anthropic's
 - `/dragonball` follows the effort level (default)
 - `/dragonball max` pins one level (`low`, `medium`, `high`, `xhigh`, `max`, `ultracode`)
 - `/dragonball off` clears it
+- `/dragonball fps 12`, `24` (default) or `60`: frame rate of every animation; lower costs less GPU
 
 A small Claude also sits at the right of the row under the prompt: it breathes while idle, charges ki while Claude works and fires a beam each time a file is written or edited. Its look follows the effort level.
 

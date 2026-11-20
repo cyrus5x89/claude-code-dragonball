@@ -1,10 +1,10 @@
 // Claude Dragonball cho app desktop: cảnh nền đen, 7 viên ngọc rồng, Claude biến hình theo mức effort của lượt.
-// /dragonball: bật lại theo effort · /dragonball <low|medium|high|xhigh|max|ultracode>: giữ một mức · /dragonball off: tắt.
+// /dragonball: bật lại theo effort · /dragonball fps 12|24|60: tốc độ khung hình · /dragonball <low|medium|high|xhigh|max|ultracode>: giữ một mức · /dragonball off: tắt.
 // Cách đặt nền theo plugin mẫu theme-examples của Anthropic: thử theme.set (mới) rồi ui.backdrop (cũ), engine thiếu thì thôi.
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import { petSvg } from './pet'
+import { BLAST_MS, FPS, petSvg, sceneAtFps } from './pet'
 import type { Pose } from '../types'
 import { SCENES } from './scenes'
 
@@ -26,7 +26,14 @@ const pose = atom({ plugin: 'dragonball', key: 'pose' } as const, 'idle' as Pose
 const level = atom({ plugin: 'dragonball', key: 'level' } as const, 'low')
 // công cụ ghi file: xong một cái là bắn chưởng
 const WRITES = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit']
-const BLAST_MS = 1700
+// $.store 'fps': 12 / 24 / 60 khung hình mỗi giây cho mọi animation, mặc định 24
+const FPS_KEY = 'fps'
+const DEFAULT_FPS = 24
+
+async function fpsOf($: { store: { get(key: string): Promise<unknown> } }): Promise<number> {
+  const fps = await $.store.get(FPS_KEY)
+  return typeof fps === 'number' && FPS.includes(fps) ? fps : DEFAULT_FPS
+}
 
 // cảnh đang hiện; biến của module, nạp lại thì đặt lại từ đầu
 let shown: string | undefined
@@ -76,7 +83,7 @@ function sceneFor(level: unknown): string {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     try {
-      await $.command.register({ name: COMMAND, description: 'Dragon-ball backdrop: off, a level to pin, or nothing to follow effort.' })
+      await $.command.register({ name: COMMAND, description: 'Dragon-ball backdrop + pet: off, a level to pin, nothing to follow effort, or fps 12|24|60.' })
     } catch (error) {
       void $.ui.toast(`dragonball: /${COMMAND} is not available (${String(error)})`)
     }
@@ -147,20 +154,27 @@ export const register: Register = on => {
     return (
       <Box>
         {e.props.modes.length > 0 && <Text dimColor>{e.props.modes.join(' & ')} </Text>}
-        <Svg isInteractive key={now} width={114} height={29} alt={`Claude ${now === 'idle' ? 'resting' : now === 'charge' ? 'charging ki' : 'firing a beam'}`} source={petSvg(shownLevel, now, true)} />
+        <Svg isInteractive key={now} width={114} height={29} alt={`Claude ${now === 'idle' ? 'resting' : now === 'charge' ? 'charging ki' : 'firing a beam'}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
       </Box>
     )
   })
 
   on('command.run', { command: COMMAND }, async ($, e) => {
     const word = e.args.trim().toLowerCase()
+    const fps = /^fps\s+(\d+)$/.exec(word)
+    if (fps !== null) {
+      const n = Number(fps[1])
+      if (!FPS.includes(n)) return { text: `fps is one of ${FPS.join(', ')}.` }
+      await $.store.set(FPS_KEY, n)
+      return { text: `Dragon-ball animations at ${n} fps.` }
+    }
     if (word === 'off') {
       await $.store.set(MODE_KEY, 'off')
       await clearScene($)
       return { text: 'Dragon-ball backdrop off. /dragonball turns it back on.' }
     }
     if (word !== '' && !LEVELS.includes(word)) {
-      return { text: `Unknown "${word}". Use off, nothing, or one of: ${LEVELS.join(', ')}.` }
+      return { text: `Unknown "${word}". Use off, fps 12|24|60, nothing, or one of: ${LEVELS.join(', ')}.` }
     }
     if (word === '') await $.store.delete(MODE_KEY)
     else await $.store.set(MODE_KEY, word)
@@ -169,13 +183,13 @@ export const register: Register = on => {
     return { text: set.isDrawn ? said : `${said} This window may not draw backdrops yet.` }
   })
 
-  on('ui.render', { component: 'Backdrop' }, ($, e, next) => {
+  on('ui.render', { component: 'Backdrop' }, async ($, e, next) => {
     if (e.props.plugin !== PLUGIN || e.surface !== 'desktop') return next(e)
     const props = e.props as { scene?: unknown; id?: unknown }
     const name = typeof props.scene === 'string' ? props.scene : typeof props.id === 'string' ? props.id : undefined
     const source = name === undefined ? undefined : SCENES[name]
     if (source === undefined) return next(e)
     const { Svg } = $.ui.resolve(e)
-    return <Svg isInteractive alt="Claude powering up among seven dragon balls" source={source} />
+    return <Svg isInteractive alt="Claude powering up among seven dragon balls" source={sceneAtFps(source, await fpsOf($))} />
   })
 }
