@@ -179,7 +179,8 @@ export function petSvg(level: string, pose: Pose, fps = 24, flip = false, x0 = 0
     ? `<g class="ki2"><svg width="224" height="224" viewBox="0 0 160 160" overflow="visible">${KI[level] ?? KI.low}</svg></g>`
     : `<g class="ki">${m.aura}</g>`
   const me = `<g class="me"><svg x="4" y="14" width="72" height="72" viewBox="0 0 224 224" overflow="visible">` +
-    `${ki}<g class="hair">${m.hair}</g><g class="bod">${m.body}</g></svg></g>`
+    // ảnh gốc nhìn sang trái; soi gương để Claude nhìn theo hướng cú đấm / chưởng (vào giữa màn hình)
+    `<g transform="translate(224 0) scale(-1 1)">${ki}<g class="hair">${m.hair}</g><g class="bod">${m.body}</g></g></svg></g>`
   // Zzz không lật để chữ đọc xuôi: đặt ngoài nhóm lật
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} -20 ${380 - x0} 106" width="${380 - x0}" height="106"><style>${css(pose, fps)}${extra} ${STILL}</style><defs>` +
     `<radialGradient id="glow"><stop offset="0" stop-color="${color}" stop-opacity=".9"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient></defs>` +
