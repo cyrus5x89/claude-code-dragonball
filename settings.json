@@ -1,10 +1,23 @@
 {
-  "theme": "custom:dragonball:dragonball",
+  "theme": "custom:dragonball",
   "spinnerVerbs": {
     "mode": "replace",
-    "verbs": ["Charging ki", "Powering up", "Going Super", "Gathering dragon balls", "Summoning the dragon",
-              "Training in the time chamber", "Sparring", "Focusing energy", "Breaking the limit", "Raising power level",
-              "Searching the radar", "Flying over", "Meditating", "Transforming"]
+    "verbs": [
+      "Charging ki",
+      "Powering up",
+      "Going Super",
+      "Gathering dragon balls",
+      "Summoning the dragon",
+      "Training in the time chamber",
+      "Sparring",
+      "Focusing energy",
+      "Breaking the limit",
+      "Raising power level",
+      "Searching the radar",
+      "Flying over",
+      "Meditating",
+      "Transforming"
+    ]
   },
   "spinnerTipsOverride": {
     "label": "❶",

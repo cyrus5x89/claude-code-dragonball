@@ -1,9 +1,10 @@
 #!/bin/zsh
-# Cài plugin + gộp settings.json của repo vào ~/.claude/settings.json (theme, câu chờ, tip). Có bản sao lưu.
+# Cài theme theo chuẩn Claude Code: ~/.claude/themes/dragonball.json, chọn bằng "theme": "custom:dragonball".
+# Gộp thêm câu chờ + tip từ settings.json vào ~/.claude/settings.json (có bản sao lưu).
 set -e
 cd "${0:A:h}"
-claude plugin marketplace add "$PWD" >/dev/null 2>&1 || true
-claude plugin install dragonball@claude-code-dragonball
+mkdir -p ~/.claude/themes
+cp themes/dragonball.json ~/.claude/themes/dragonball.json
 S=~/.claude/settings.json
 [[ -f $S ]] && cp "$S" "$S.bak-dragonball"
 python3 - "$S" settings.json <<'PY'
@@ -13,4 +14,4 @@ d = json.load(open(dst)) if os.path.exists(dst) else {}
 d.update(src)
 json.dump(d, open(dst, "w"), indent=2, ensure_ascii=False)
 PY
-echo "xong: mở lại Claude Code (CLI hoặc app). Bỏ: cp $S.bak-dragonball $S"
+echo "xong: Claude Code (CLI và app) dùng theme Claude Dragonball. Bỏ: cp $S.bak-dragonball $S"
