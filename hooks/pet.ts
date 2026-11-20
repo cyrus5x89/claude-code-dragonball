@@ -72,7 +72,7 @@ export function petSvg(level: string, pose: Pose, fps = 24, flip = false): strin
     `<g${flip ? ' transform="translate(380 0) scale(-1 1)"' : ''}>` +
     '<ellipse class="aura" cx="40" cy="52" rx="40" ry="44" fill="url(#glow)"/>' +
     (pose === 'charge' ? '<ellipse class="aura2" cx="40" cy="50" rx="30" ry="40" fill="url(#glow)" opacity=".6"/>' : '') +
-    `${sparks}${blast}<g class="me"><svg x="4" y="14" width="72" height="72" viewBox="0 0 256 256">${body}</svg></g></g></svg>`
+    `${sparks}${blast}<g class="me"><svg x="4" y="14" width="72" height="72" viewBox="0 0 224 224">${body}</svg></g></g></svg>`
 }
 
 /** Cảnh nền cũng có animation (ngọc nhấp nháy, hào quang thở): đổi easing theo fps như trên. */

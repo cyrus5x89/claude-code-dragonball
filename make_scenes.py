@@ -2,6 +2,8 @@
 # python3 make_scenes.py
 import json, math, pathlib, re, subprocess, tempfile
 
+from PIL import Image
+
 HERE = pathlib.Path(__file__).parent
 LEVELS = ["low", "medium", "high", "xhigh", "max", "ultracode"]
 AURA = {"low": "#F2C230", "medium": "#C98A0B", "high": "#FFD84D", "xhigh": "#E0384F", "max": "#2FA8F0", "ultracode": "#D8DEE9"}
@@ -26,26 +28,31 @@ def balls():
 
 
 def _mascot(level):
-    # app không nhận ảnh nhúng trong nền (chỉ vector), nên vẽ lại mascot thành path bằng vtracer, bỏ các mảng nền tối
+    # app không nhận ảnh nhúng trong nền (chỉ vector), nên vẽ lại mascot thành path bằng vtracer (cutout: mỗi mảng màu
+    # một path, không chồng lớp nên không bị vệt tối trên mặt), rồi bỏ các path cùng màu nền (màu góc ảnh)
+    src = HERE / f"art/mascot/claude-{level}.png"
     with tempfile.TemporaryDirectory() as tmp:
         out = pathlib.Path(tmp, "m.svg")
         subprocess.run(["uv", "run", "--quiet", "--python", "3.12", "--with", "vtracer", "--with", "pillow", "python", "-c",
-                        "import sys,vtracer;from PIL import Image;Image.open(sys.argv[1]).convert('RGB').resize((256,256)).save(sys.argv[2]+'.png');"
-                        "vtracer.convert_image_to_svg_py(sys.argv[2]+'.png',sys.argv[2],colormode='color',hierarchical='stacked',mode='spline',"
-                        "filter_speckle=6,color_precision=5,layer_difference=24,corner_threshold=60,length_threshold=4.0,splice_threshold=45,path_precision=1)",
-                        str(HERE / f"art/mascot/claude-{level}.png"), str(out)], check=True)
+                        "import sys,vtracer;from PIL import Image;Image.open(sys.argv[1]).convert('RGB').resize((224,224)).save(sys.argv[2]+'.png');"
+                        "vtracer.convert_image_to_svg_py(sys.argv[2]+'.png',sys.argv[2],colormode='color',hierarchical='cutout',mode='spline',"
+                        "filter_speckle=4,color_precision=6,layer_difference=12,corner_threshold=60,length_threshold=4.0,splice_threshold=45,path_precision=1)",
+                        str(src), str(out)], check=True)
         paths = re.findall(r"<path[^>]*/>", out.read_text())
+    corner = Image.open(src).convert("RGB").getpixel((4, 4))
 
-    def dark(p):
-        # mảng nền: tối và phủ gần hết khung (giữ lại mắt, viền nhỏ)
+    def background(p):
         c = re.search(r'fill="#([0-9A-Fa-f]{6})"', p)
-        if c is None or sum(int(c.group(1)[i:i + 2], 16) for i in (0, 2, 4)) >= 3 * 40:
+        if c is None or sum(abs(int(c.group(1)[i * 2:i * 2 + 2], 16) - corner[i]) for i in range(3)) >= 45:
             return False
-        nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", re.search(r'd="([^"]*)"', p).group(1))]
-        xs, ys = nums[0::2], nums[1::2]
-        return max(xs) - min(xs) > 150 or max(ys) - min(ys) > 150
+        # mắt cũng tối như nền: chỉ bỏ mảng chạm mép ảnh (path có toạ độ tuyệt đối qua transform translate)
+        t = re.search(r'translate\(([-\d.]+),\s*([-\d.]+)\)', p)
+        ox, oy = (float(t.group(1)), float(t.group(2))) if t else (0.0, 0.0)
+        nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", re.search(r' d="([^"]*)"', p).group(1))]
+        xs, ys = [x + ox for x in nums[0::2]], [y + oy for y in nums[1::2]]
+        return min(xs) < 3 or min(ys) < 3 or max(xs) > 221 or max(ys) > 221
 
-    return "".join(p for p in paths[1:] if not dark(p))  # path đầu của chế độ stacked là cả khung nền
+    return "".join(p for p in paths if not background(p))
 
 
 _PATHS = {}
@@ -59,7 +66,7 @@ def mascot(level):
 
 def scene(level=None):
     color = AURA.get(level, "#D97757")
-    body = (f'<svg x="1150" y="640" width="340" height="340" viewBox="0 0 256 256" opacity=".45">{mascot(level)}</svg>' if level else
+    body = (f'<svg x="1150" y="640" width="340" height="340" viewBox="0 0 224 224" opacity=".45">{mascot(level)}</svg>' if level else
             '<text x="1330" y="850" font-size="120" text-anchor="middle" fill="#D97757" opacity=".18">✳</text>')
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">'
             f'<style>{CSS} {STILL}</style><defs>'
