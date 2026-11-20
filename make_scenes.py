@@ -1,6 +1,6 @@
 # hooks/scenes.ts: cảnh nền Claude Dragonball cho app desktop (mod), một cảnh gốc + một cảnh mỗi mức effort
 # python3 make_scenes.py
-import json, math, pathlib, re, subprocess, tempfile
+import json, math, pathlib, re, subprocess, sys, tempfile
 
 import numpy as np
 from PIL import Image
@@ -192,6 +192,12 @@ def scene(level=None):
             '</defs><rect width="1600" height="1000" fill="#0E0E0E"/>'
             f'<g transform="translate({CX - 0.65 * 1330:.0f} {CY - 0.65 * 800:.0f}) scale(.65)"><ellipse class="aura" cx="1330" cy="800" rx="420" ry="360" fill="url(#glow)"/>{body}{balls()}</g></svg>')
 
+
+if "--frames" in sys.argv:
+    # khung PNG của pet CLI (make_cli_frames.ts) nén về bảng 256 màu có alpha: nhẹ hơn nhiều, nhìn như cũ
+    for f in sorted((HERE / "frames").rglob("*.png")):
+        Image.open(f).convert("RGBA").quantize(256, method=Image.Quantize.FASTOCTREE).save(f, optimize=True)
+    sys.exit()
 
 scenes = {"dragonball": scene(), **{f"dragonball-{lv}": scene(lv) for lv in LEVELS}}
 for k, v in scenes.items():

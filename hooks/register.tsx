@@ -6,6 +6,7 @@ import type { Register } from 'claude-code'
 
 import { BLAST_MS, FPS, PUNCH_MS, petSvg, sceneAtFps } from './pet'
 import type { Pose } from '../types'
+import { FRAME_FPS, FRAMES } from './frames'
 import { SCENES } from './scenes'
 
 const PLUGIN = 'dragonball'
@@ -83,10 +84,54 @@ async function clearScene($: AnyEngine): Promise<void> {
   }
 }
 
-// Nền và con pet chỉ dành cho app desktop. Một phiên CLI (terminal) cũng chạy plugin này: nếu nó đặt cảnh, nền của app
-// đổi theo effort và dáng của phiên CLI. Nên mọi việc đặt cảnh / đổi dáng chỉ chạy khi phiên đang vẽ trên app.
+// Nền chỉ có trên app desktop. Một phiên CLI (terminal) cũng chạy plugin này: nếu nó đặt cảnh, nền của app đổi theo
+// effort của phiên CLI. Nên chỉ phiên đang vẽ trên app mới đặt cảnh; dáng con pet là của riêng từng phiên, chạy ở cả hai.
 async function inApp($: { session: { surfaces(): Promise<readonly string[]> } }): Promise<boolean> {
   return (await $.session.surfaces()).includes('desktop')
+}
+
+// con pet CLI: cỡ ô (cột x hàng) theo đúng tỉ lệ ảnh (ô chữ iTerm2 cao ~2.8 lần rộng) để ảnh lấp kín ô, chân con Claude
+// chạm đáy dải. Khung hẹp quanh con Claude, khung rộng lúc bắn chưởng.
+const CLI_ROWS = 6
+const CLI_NARROW = 20
+const CLI_WIDE = 60
+// ảnh đang gắn trên dải và số khung đã chạy; một bộ đếm giờ cho cả phiên, chỉ đổi khung khi có ảnh
+type Band = { requestId: string; key: string; level: string; pose: Pose; root: string; tick: number }
+let band: Band | undefined
+let ticking = false
+
+// iTerm2 chỉ nhận ảnh dạng byte PNG (kitty / Ghostty mới đọc được đường dẫn file), nên đọc file một lần rồi giữ base64
+const pngs = new Map<string, string>()
+type Fs = { fs: { read(path: string, options: { as: 'bytes' }): Promise<{ base64: string }> } }
+
+async function frameSource($: Fs, b: Band, tick: number): Promise<{ png: string }> {
+  const f = FRAMES[b.pose] ?? { intro: 1, loop: 0, wide: false }
+  // mở đầu chạy một lần, rồi lặp đoạn loop; không có loop thì giữ khung cuối
+  const i = tick < f.intro || f.loop === 0 ? Math.min(tick, f.intro - 1) : f.intro + (tick - f.intro) % f.loop
+  const path = `${b.root}/frames/${b.level}/${b.pose}/${i}.png`
+  let png = pngs.get(path)
+  if (png === undefined) {
+    png = (await $.fs.read(path, { as: 'bytes' })).base64
+    pngs.set(path, png)
+  }
+  return { png }
+}
+
+function startTicker($: Fs & { clock: { every(ms: number, fn: () => void): { cancel(): void } }; ui: { blit(args: never): Promise<{ deny?: string }> } }): void {
+  if (ticking) return
+  ticking = true
+  const timer = $.clock.every(Math.round(1000 / FRAME_FPS), () => {
+    const b = band
+    if (b === undefined) return
+    b.tick += 1
+    void frameSource($, b, b.tick)
+      .then(source => $.ui.blit({ requestId: b.requestId, key: b.key, source } as never))
+      .then(r => {
+        // terminal không hiện được ảnh (đang vẽ chữ alt thay): thôi đổi khung cho đỡ tốn máy
+        if (r.deny !== undefined && band === b) { timer.cancel(); ticking = false; band = undefined }
+      })
+      .catch(() => undefined)
+  })
 }
 
 function sceneFor(level: unknown): string {
@@ -129,11 +174,10 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     // hook này chặn được lượt gửi: lỗi của nền / pet không được làm hỏng tin nhắn
     await (async () => {
-      if (!await inApp($)) return
       restId += 1
       await update($, pose, () => 'charge')
       const mode = await $.store.get(MODE_KEY)
-      if (mode === 'off') return
+      if (mode === 'off' || !await inApp($)) return
       shown = undefined
       await setScene($, sceneFor(mode))
     })().catch(() => undefined)
@@ -142,10 +186,9 @@ export const register: Register = on => {
 
   // mỗi lần gửi model một yêu cầu: đổi cảnh theo effort của lượt, trừ khi đã tắt hoặc giữ một mức
   on('turn.step', async function* ($, e, next) {
-    if (!await inApp($)) return yield* next(e)
     if (typeof e.effort === 'string') await update($, level, () => e.effort as string)
     const mode = await $.store.get(MODE_KEY)
-    if (mode === undefined) {
+    if (mode === undefined && await inApp($)) {
       try {
         await setScene($, sceneFor(e.effort))
       } catch {
@@ -160,7 +203,6 @@ export const register: Register = on => {
     const result = await next(e)
     // chỉ là hoạt hình: lỗi ở đây không được đổi kết quả của công cụ
     await (async () => {
-      if (!await inApp($)) return
       const hit: Pose = WRITES.includes(e.tool) ? 'blast' : 'punch'
       if (hit === 'punch' && await read($, pose) === 'blast') return  // đang bắn chưởng thì không cắt ngang
       await update($, pose, () => hit)
@@ -172,7 +214,6 @@ export const register: Register = on => {
   })
 
   on('turn.complete', async ($, e, next) => {
-    if (!await inApp($)) return next(e)
     await update($, pose, () => 'idle')
     const mine = ++restId
     void (async () => {
@@ -185,11 +226,24 @@ export const register: Register = on => {
   // Claude nhỏ ở mép phải ngay trên ô chat (chưởng bắn sang trái). App không vẽ cây của plugin ở dòng dưới ô chat
   // (chỗ SessionMode) khi không có nhãn chế độ nào, nên dùng dải AbovePrompt và dồn sang phải.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.surface !== 'desktop' || e.props.hasSurvey) return next(e)
+    if (e.props.hasSurvey || (e.surface !== 'desktop' && e.surface !== 'terminal')) return next(e)
     const mode = await $.store.get(MODE_KEY)
     if (mode === 'off') return next(e)
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
     const now = await read($, pose)
+    if (e.surface === 'terminal') {
+      // terminal không vẽ SVG: ảnh PNG dựng sẵn (make_cli_frames.mts), đổi khung bằng $.ui.blit theo nhịp FRAME_FPS
+      const { Box, Image } = $.ui.resolve(e)
+      const wide = FRAMES[now]?.wide ?? false
+      const key = `pet-${now}`
+      band = { requestId: e.requestId, key, level: shownLevel, pose: now, root: $.plugin.root, tick: 0 }
+      startTicker($)
+      return (
+        <Box flexDirection="row" justifyContent="flex-end">
+          <Image key={key} source={await frameSource($, band, 0)} columns={wide ? CLI_WIDE : CLI_NARROW} rows={CLI_ROWS} alt={`Claude ${ALT[now]}`} />
+        </Box>
+      )
+    }
     const { Box, Svg } = $.ui.resolve(e)
     // app tự bọc dải này trong một thẻ xám rộng bằng ô chat và cắt phần tràn ra ngoài (lề âm hay khung hẹp đều bị cắt), nên giữ khung đầy đủ, dồn phải
     return (

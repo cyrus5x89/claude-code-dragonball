@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "description": "Dev tools only: renders the CLI pet frames (make_cli_frames.ts). The plugin itself needs none of this.",
+  "scripts": { "frames": "tsx make_cli_frames.ts && python3 make_scenes.py --frames" },
+  "devDependencies": { "playwright-core": "1.49.1", "tsx": "4.19.2" }
+}
