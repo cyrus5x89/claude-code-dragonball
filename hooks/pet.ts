@@ -91,14 +91,14 @@ export function petSvg(level: string, pose: Pose, fps = 24, flip = false): strin
     if (SPARKY.includes(level)) {
       parts.push(...BOLTS.map((d, i) => `<path class="bolt" style="animation-delay:-${i * 0.23}s" d="${d}" fill="none" stroke="#E8F6FF" stroke-width="2.2" stroke-linejoin="round"/>`))
     }
-    parts.push(...ROCKS.map(([x, d]) => `<path class="rock" style="animation-delay:-${d}s;transform-box:fill-box;transform-origin:center" d="M${x},94 l4,-3 l4,2 l-1,4 l-5,1 z" fill="#8A847D"/>`))
+    parts.push(...ROCKS.map(([x, d]) => `<path class="rock" style="animation-delay:-${d}s;transform-box:fill-box;transform-origin:center" d="M${x},84 l4,-3 l4,2 l-1,4 l-5,1 z" fill="#8A847D"/>`))
   }
   if (pose === 'punch') {
     parts.push('<g class="speed" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".8"><path d="M78,40 H104"/><path d="M80,52 H112"/><path d="M78,64 H100"/></g>',
       '<path class="hit" d="M100,34 L104,45 L116,42 L107,51 L118,59 L105,58 L102,70 L97,58 L85,61 L93,51 L84,43 L96,45 Z" fill="#FFE066" stroke="#FFFFFF" stroke-width="1.5"/>')
   }
   if (pose === 'blast') {
-    parts.push('<rect class="flash" x="0" y="-12" width="380" height="108" rx="12" fill="#BFF3FF" opacity="0"/>',
+    parts.push('<rect class="flash" x="0" y="-20" width="380" height="106" rx="12" fill="#BFF3FF" opacity="0"/>',
       '<g class="beam"><rect x="70" y="41" width="300" height="22" rx="11" fill="url(#beam)"/><rect x="70" y="48" width="300" height="8" rx="4" fill="url(#core)"/></g>',
       '<g class="orb"><circle cx="72" cy="52" r="15" fill="url(#orbg)"/><circle cx="72" cy="52" r="6" fill="#fff"/></g>')
   }
@@ -109,7 +109,7 @@ export function petSvg(level: string, pose: Pose, fps = 24, flip = false): strin
   const me = `<g class="me"><svg x="4" y="14" width="72" height="72" viewBox="0 0 224 224">${body}</svg></g>`
   // Zzz không lật để chữ đọc xuôi: đặt ngoài nhóm lật, toạ độ tính lại
   const zzzOut = flip ? zzz.replace(/x="62"/g, 'x="300"') : zzz
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -12 380 108" width="380" height="108"><style>${css(pose, fps)} ${STILL}</style><defs>` +
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -20 380 106" width="380" height="106"><style>${css(pose, fps)} ${STILL}</style><defs>` +
     `<radialGradient id="glow"><stop offset="0" stop-color="${color}" stop-opacity=".9"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient>` +
     '<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.6"/></filter>' +
     '<radialGradient id="orbg"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#9FE8FF"/><stop offset="1" stop-color="#4FB8FF" stop-opacity="0"/></radialGradient>' +

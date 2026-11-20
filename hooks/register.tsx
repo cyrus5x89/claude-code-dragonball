@@ -168,10 +168,10 @@ export const register: Register = on => {
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
     const now = await read($, pose)
     const { Box, Svg } = $.ui.resolve(e)
-    // app tự bọc dải này trong một thẻ xám và cắt phần tràn ra ngoài, nên con Claude nằm gọn trong thẻ, dồn sát phải
+    // app tự bọc dải này trong một thẻ xám và cắt phần tràn ra ngoài: chân con Claude chạm đáy hình, lấn vào lề dưới/phải của thẻ để ngồi sát góc
     return (
-      <Box flexDirection="row" justifyContent="flex-end">
-        <Svg isInteractive key={now} width={634} height={180} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
+      <Box flexDirection="row" justifyContent="flex-end" marginBottom={-14} marginRight={-12}>
+        <Svg isInteractive key={now} width={634} height={177} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
       </Box>
     )
   })
