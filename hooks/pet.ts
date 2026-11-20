@@ -22,7 +22,8 @@ const CSS: Record<Pose, string> = {
     '.orb{animation:orb 1.6s ease-out both}@keyframes orb{0%{r:4}20%{r:13}80%{r:11;opacity:1}100%{r:2;opacity:0}}',
 }
 
-export function petSvg(level: string, pose: Pose): string {
+// flip: lật ngang (Claude ở mép phải, chưởng bắn sang trái) cho chỗ góc phải dưới ô chat
+export function petSvg(level: string, pose: Pose, flip = false): string {
   const color = AURA[level] ?? '#D97757'
   const body = MASCOTS[level] ?? MASCOTS.low
   const sparks = pose === 'charge'
@@ -36,6 +37,7 @@ export function petSvg(level: string, pose: Pose): string {
     `<defs><radialGradient id="glow"><stop offset="0" stop-color="${color}" stop-opacity=".9"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient>` +
     `<linearGradient id="beam" x1="0" x2="1"><stop offset="0" stop-color="#9FE8FF"/><stop offset=".7" stop-color="#4FB8FF"/><stop offset="1" stop-color="#4FB8FF" stop-opacity="0"/></linearGradient>` +
     `<linearGradient id="core" x1="0" x2="1"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>` +
+    `<g${flip ? ' transform="translate(380 0) scale(-1 1)"' : ''}>` +
     `<ellipse class="aura" cx="40" cy="48" rx="40" ry="44" fill="url(#glow)"/>${sparks}${beam}` +
-    `<g class="me"><svg x="4" y="12" width="72" height="72" viewBox="0 0 256 256">${body}</svg></g></svg>`
+    `<g class="me"><svg x="4" y="12" width="72" height="72" viewBox="0 0 256 256">${body}</svg></g></g></svg>`
 }

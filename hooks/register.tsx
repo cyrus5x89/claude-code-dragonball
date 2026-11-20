@@ -137,13 +137,19 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.surface !== 'desktop' || e.props.hasSurvey) return next(e)
+  // góc phải dòng dưới ô chat (cạnh nhãn chế độ "Auto"): Claude nhỏ, chưởng bắn sang trái
+  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
+    if (e.surface !== 'desktop') return next(e)
     const mode = await $.store.get(MODE_KEY)
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
-    const { Svg } = $.ui.resolve(e)
     const now = await read($, pose)
-    return <Svg isInteractive key={now} alt={`Claude ${now === 'idle' ? 'resting' : now === 'charge' ? 'charging ki' : 'firing a beam'}`} source={petSvg(shownLevel, now)} />
+    const { Box, Svg, Text } = $.ui.resolve(e)
+    return (
+      <Box>
+        {e.props.modes.length > 0 && <Text dimColor>{e.props.modes.join(' & ')} </Text>}
+        <Svg isInteractive key={now} width={114} height={29} alt={`Claude ${now === 'idle' ? 'resting' : now === 'charge' ? 'charging ki' : 'firing a beam'}`} source={petSvg(shownLevel, now, true)} />
+      </Box>
+    )
   })
 
   on('command.run', { command: COMMAND }, async ($, e) => {
