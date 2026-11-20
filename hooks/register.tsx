@@ -30,6 +30,8 @@ const WRITES = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit']
 const SLEEP_AFTER_MS = 90_000
 // mỗi lần nghỉ một số mới: hẹn giờ ngủ của lần nghỉ cũ thấy số khác thì thôi
 let restId = 0
+// thẻ xám app bọc quanh dải không tắt được: phủ lên nó một lớp cùng màu nền tối của app (#161616) cho nó biến mất
+const BAND_COVER = '#161616'
 const ALT: Record<string, string> = {
   idle: 'resting', sleep: 'asleep', charge: 'charging ki', punch: 'punching', blast: 'firing a beam',
 }
@@ -170,7 +172,7 @@ export const register: Register = on => {
     const { Box, Svg } = $.ui.resolve(e)
     // app tự bọc dải này trong một thẻ xám và cắt phần tràn ra ngoài: chân con Claude chạm đáy hình, lấn vào lề dưới/phải của thẻ để ngồi sát góc
     return (
-      <Box flexDirection="row" justifyContent="flex-end" marginBottom={-14} marginRight={-12}>
+      <Box flexDirection="row" justifyContent="flex-end" margin={-40} paddingTop={40} paddingLeft={40} paddingRight={28} paddingBottom={26} backgroundColor={BAND_COVER}>
         <Svg isInteractive key={now} width={634} height={177} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
       </Box>
     )
