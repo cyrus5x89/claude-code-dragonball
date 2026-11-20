@@ -168,12 +168,10 @@ export const register: Register = on => {
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
     const now = await read($, pose)
     const { Box, Svg } = $.ui.resolve(e)
-    // dải này app tự bọc trong một thẻ xám: giữ dải thấp, cho con Claude tràn xuống ngồi lên mép trên ô chat
+    // app tự bọc dải này trong một thẻ xám và cắt phần tràn ra ngoài, nên con Claude nằm gọn trong thẻ, dồn sát phải
     return (
-      <Box position="relative" height={6}>
-        <Box position="absolute" right={6} bottom={-44}>
-          <Svg isInteractive key={now} width={266} height={76} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
-        </Box>
+      <Box flexDirection="row" justifyContent="flex-end">
+        <Svg isInteractive key={now} width={228} height={65} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
       </Box>
     )
   })
