@@ -168,12 +168,10 @@ export const register: Register = on => {
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
     const now = await read($, pose)
     const { Box, Svg } = $.ui.resolve(e)
-    // chỉ chưởng cần cả dải; đấm cần chỗ cho tia nổ; còn lại chỉ ôm con Claude, thử cho thẻ xám của app co theo
-    const x0 = now === 'blast' ? 0 : now === 'punch' ? 250 : 296
-    // app tự bọc dải này trong một thẻ xám và cắt phần tràn ra ngoài: chân con Claude chạm đáy hình, lấn vào lề dưới/phải của thẻ để ngồi sát góc
+    // app tự bọc dải này trong một thẻ xám rộng bằng ô chat và cắt phần tràn ra ngoài (lề âm hay khung hẹp đều bị cắt), nên giữ khung đầy đủ, dồn phải
     return (
-      <Box flexDirection="row" justifyContent="flex-end" alignSelf="flex-end" marginBottom={-14} marginRight={-12}>
-        <Svg isInteractive key={now} width={Math.round((380 - x0) * 634 / 380)} height={177} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true, x0)} />
+      <Box flexDirection="row" justifyContent="flex-end">
+        <Svg isInteractive key={now} width={634} height={177} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
       </Box>
     )
   })
