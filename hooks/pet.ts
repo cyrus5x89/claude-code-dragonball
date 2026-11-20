@@ -77,7 +77,8 @@ const BOLTS = ['M14,20 L22,34 L16,36 L26,52', 'M66,16 L58,30 L65,32 L54,48', 'M8
 const ROCKS = [[16, 0], [30, 0.5], [52, 0.25], [64, 0.8]]
 
 // flip: lật ngang (Claude ở mép phải, chưởng và cú đấm hướng sang trái)
-export function petSvg(level: string, pose: Pose, fps = 24, flip = false): string {
+// x0: cắt bỏ phần trái của dải (lật thì đó là chỗ trống trước mặt), để khung chỉ ôm con Claude khi không bắn chưởng
+export function petSvg(level: string, pose: Pose, fps = 24, flip = false, x0 = 0): string {
   const color = AURA[level] ?? '#D97757'
   const body = MASCOTS[level] ?? MASCOTS.low
   const fiery = pose === 'charge' || pose === 'blast'
@@ -109,7 +110,7 @@ export function petSvg(level: string, pose: Pose, fps = 24, flip = false): strin
   const me = `<g class="me"><svg x="4" y="14" width="72" height="72" viewBox="0 0 224 224">${body}</svg></g>`
   // Zzz không lật để chữ đọc xuôi: đặt ngoài nhóm lật, toạ độ tính lại
   const zzzOut = flip ? zzz.replace(/x="62"/g, 'x="300"') : zzz
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -20 380 106" width="380" height="106"><style>${css(pose, fps)} ${STILL}</style><defs>` +
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} -20 ${380 - x0} 106" width="${380 - x0}" height="106"><style>${css(pose, fps)} ${STILL}</style><defs>` +
     `<radialGradient id="glow"><stop offset="0" stop-color="${color}" stop-opacity=".9"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient>` +
     '<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.6"/></filter>' +
     '<radialGradient id="orbg"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#9FE8FF"/><stop offset="1" stop-color="#4FB8FF" stop-opacity="0"/></radialGradient>' +
