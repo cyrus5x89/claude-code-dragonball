@@ -36,6 +36,8 @@ const ALT: Record<string, string> = {
 }
 // $.store 'fps': 12 / 24 / 60 khung hình mỗi giây cho mọi animation, mặc định 24
 const FPS_KEY = 'fps'
+// con pet ở mép phải (mặc định, chưởng bắn sang trái) hay mép trái (lật lại, chưởng bắn sang phải)
+const SIDE_KEY = 'side'
 const DEFAULT_FPS = 24
 
 async function fpsOf($: { store: { get(key: string): Promise<unknown> } }): Promise<number> {
@@ -96,7 +98,7 @@ const CLI_ROWS = 6
 const CLI_NARROW = 20
 const CLI_WIDE = 60
 // ảnh đang gắn trên dải và số khung đã chạy; một bộ đếm giờ cho cả phiên, chỉ đổi khung khi có ảnh
-type Band = { requestId: string; key: string; level: string; pose: Pose; root: string; tick: number }
+type Band = { requestId: string; key: string; level: string; pose: Pose; root: string; tick: number; left: boolean }
 let band: Band | undefined
 let ticking = false
 
@@ -108,7 +110,7 @@ async function frameSource($: Fs, b: Band, tick: number): Promise<{ png: string 
   const f = FRAMES[b.pose] ?? { intro: 1, loop: 0, wide: false }
   // mở đầu chạy một lần, rồi lặp đoạn loop; không có loop thì giữ khung cuối
   const i = tick < f.intro || f.loop === 0 ? Math.min(tick, f.intro - 1) : f.intro + (tick - f.intro) % f.loop
-  const path = `${b.root}/frames/${b.level}/${b.pose}/${i}.png`
+  const path = `${b.root}/frames/${b.level}/${b.pose}/${b.left ? 'l' : ''}${i}.png`
   let png = pngs.get(path)
   if (png === undefined) {
     png = (await $.fs.read(path, { as: 'bytes' })).base64
@@ -231,15 +233,16 @@ export const register: Register = on => {
     if (mode === 'off') return next(e)
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
     const now = await read($, pose)
+    const left = (await $.store.get(SIDE_KEY)) === 'left'
     if (e.surface === 'terminal') {
       // terminal không vẽ SVG: ảnh PNG dựng sẵn (make_cli_frames.mts), đổi khung bằng $.ui.blit theo nhịp FRAME_FPS
       const { Box, Image } = $.ui.resolve(e)
       const wide = FRAMES[now]?.wide ?? false
       const key = `pet-${now}`
-      band = { requestId: e.requestId, key, level: shownLevel, pose: now, root: $.plugin.root, tick: 0 }
+      band = { requestId: e.requestId, key, level: shownLevel, pose: now, root: $.plugin.root, tick: 0, left }
       startTicker($)
       return (
-        <Box flexDirection="row" justifyContent="flex-end">
+        <Box flexDirection="row" justifyContent={left ? 'flex-start' : 'flex-end'}>
           <Image key={key} source={await frameSource($, band, 0)} columns={wide ? CLI_WIDE : CLI_NARROW} rows={CLI_ROWS} alt={`Claude ${ALT[now]}`} />
         </Box>
       )
@@ -247,8 +250,8 @@ export const register: Register = on => {
     const { Box, Svg } = $.ui.resolve(e)
     // app tự bọc dải này trong một thẻ xám rộng bằng ô chat và cắt phần tràn ra ngoài (lề âm hay khung hẹp đều bị cắt), nên giữ khung đầy đủ, dồn phải
     return (
-      <Box flexDirection="row" justifyContent="flex-end">
-        <Svg isInteractive key={now} width={634} height={177} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
+      <Box flexDirection="row" justifyContent={left ? 'flex-start' : 'flex-end'}>
+        <Svg isInteractive key={now} width={634} height={177} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), !left)} />
       </Box>
     )
   })
@@ -262,17 +265,21 @@ export const register: Register = on => {
       await $.store.set(FPS_KEY, n)
       return { text: `Dragon-ball animations at ${n} fps.` }
     }
+    if (word === 'left' || word === 'right') {
+      await $.store.set(SIDE_KEY, word)
+      return { text: `Pet on the ${word}; it moves on the next turn.` }
+    }
     if (word === 'off') {
       await $.store.set(MODE_KEY, 'off')
       if (await inApp($)) await clearScene($)
       return { text: 'Dragon-ball backdrop off. /dragonball turns it back on.' }
     }
     if (word !== '' && !LEVELS.includes(word)) {
-      return { text: `Unknown "${word}". Use off, fps 12|24|60, nothing, or one of: ${LEVELS.join(', ')}.` }
+      return { text: `Unknown "${word}". Use off, left, right, fps 12|24|60, nothing, or one of: ${LEVELS.join(', ')}.` }
     }
     if (word === '') await $.store.delete(MODE_KEY)
     else await $.store.set(MODE_KEY, word)
-    if (!await inApp($)) return { text: 'Saved. The dragon-ball backdrop and pet show in the Claude desktop app; in the terminal the theme is /theme.' }
+    if (!await inApp($)) return { text: 'Saved. The backdrop shows in the Claude desktop app; the pet follows it here.' }
     shown = undefined
     const set = await setScene($, sceneFor(word || undefined))
     const said = word === '' ? 'Dragon-ball backdrop follows the effort level.' : `Dragon-ball backdrop pinned to ${word}.`

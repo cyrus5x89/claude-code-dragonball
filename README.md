@@ -27,6 +27,7 @@ Then send any message: the backdrop and the pet appear with the first turn.
 - `/dragonball` follows the effort level (default)
 - `/dragonball max` pins one level (`low`, `medium`, `high`, `xhigh`, `max`, `ultracode`)
 - `/dragonball off` turns the backdrop and the pet off
+- `/dragonball left` / `right` (default): which edge the pet sits on, in the app and the CLI; on the left it faces right and fires the Kamehameha rightward
 - `/dragonball fps 12`, `24` (default) or `60`: frame rate of every animation; lower costs less GPU
 
 **The pet.** Each mascot is split into three layers (ki aura, hair, body) that move on their own: the body breathes, the hair sways a beat later, the aura pulses. Low and medium have no aura of their own, so electricity crackles around them instead. The effects (lightning, impact bursts, Kamehameha orb and beam, rocks, dust, Zzz, sleep bubble) are drawn with `studio image` as sprite sheets in `art/fx/` (prompts in `art/fx/prompts/`), then cut and traced to vectors by `make_scenes.py`.

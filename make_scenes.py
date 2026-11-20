@@ -3,7 +3,7 @@
 import json, math, pathlib, re, subprocess, sys, tempfile
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 from scipy import ndimage as nd
 
 HERE = pathlib.Path(__file__).parent
@@ -196,7 +196,12 @@ def scene(level=None):
 if "--frames" in sys.argv:
     # khung PNG của pet CLI (make_cli_frames.ts) nén về bảng 256 màu có alpha: nhẹ hơn nhiều, nhìn như cũ
     for f in sorted((HERE / "frames").rglob("*.png")):
-        Image.open(f).convert("RGBA").quantize(256, method=Image.Quantize.FASTOCTREE).save(f, optimize=True)
+        if f.name.startswith("l"):
+            continue
+        im = Image.open(f).convert("RGBA")
+        im.quantize(256, method=Image.Quantize.FASTOCTREE).save(f, optimize=True)
+        # bản soi gương cho /dragonball left: con pet ở mép trái, chưởng bắn sang phải
+        ImageOps.mirror(im).quantize(256, method=Image.Quantize.FASTOCTREE).save(f.with_name("l" + f.name), optimize=True)
     sys.exit()
 
 scenes = {"dragonball": scene(), **{f"dragonball-{lv}": scene(lv) for lv in LEVELS}}
