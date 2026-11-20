@@ -68,4 +68,5 @@ For the iTerm2 IDE layout (preview pane, Saiyan watermark per effort level) see 
 
 - The pixel Clawd in the terminal welcome header cannot be changed; in the desktop app the mascot lives in the backdrop instead.
 - The CLI and the desktop app read the same `~/.claude/settings.json`, so the theme applies to both.
+- A CLI session with the plugin installed leaves the app alone: the backdrop and pet only react to sessions drawn in the desktop app.
 - The pet and backdrop need a desktop app version that draws mod backdrops (tested on 2.1.326).

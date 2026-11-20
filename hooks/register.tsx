@@ -18,7 +18,7 @@ const MODE_KEY = 'mode'
 type Answer = { isDrawn: boolean }
 type AnyEngine = {
   theme?: { set(args: unknown): Promise<Answer>; clear(): Promise<unknown> }
-  ui: { toast(text: string): Promise<unknown>; backdrop?(args: unknown): Promise<Answer> }
+  ui: { toast(text: string): unknown; backdrop?(args: unknown): Promise<Answer> }
 }
 
 // con pet cạnh ô chat: dáng (thở / ngủ / gồng ki / đấm / bắn chưởng) và mức effort để chọn con Claude nào
@@ -83,6 +83,12 @@ async function clearScene($: AnyEngine): Promise<void> {
   }
 }
 
+// Nền và con pet chỉ dành cho app desktop. Một phiên CLI (terminal) cũng chạy plugin này: nếu nó đặt cảnh, nền của app
+// đổi theo effort và dáng của phiên CLI. Nên mọi việc đặt cảnh / đổi dáng chỉ chạy khi phiên đang vẽ trên app.
+async function inApp($: { session: { surfaces(): Promise<readonly string[]> } }): Promise<boolean> {
+  return (await $.session.surfaces()).includes('desktop')
+}
+
 function sceneFor(level: unknown): string {
   return typeof level === 'string' && LEVELS.includes(level) ? `dragonball-${level}` : 'dragonball'
 }
@@ -95,7 +101,7 @@ export const register: Register = on => {
       void $.ui.toast(`dragonball: /${COMMAND} is not available (${String(error)})`)
     }
     const mode = await $.store.get(MODE_KEY)
-    if (mode !== 'off') {
+    if (mode !== 'off' && await inApp($)) {
       try {
         await setScene($, sceneFor(mode))
       } catch {
@@ -105,10 +111,8 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // đầu mỗi lượt đặt lại cảnh: app bỏ qua cảnh đặt trước khi cửa sổ gắn vào phiên (phiên mới, sau /clear)
-  on('prompt.submit', async ($, e, next) => {
-    restId += 1
-    await update($, pose, () => 'charge')
+  // cửa sổ app gắn vào phiên sau khi phiên đã chạy: đặt cảnh lúc đó
+  on('session.attach', { surface: 'desktop' }, async ($, e, next) => {
     const mode = await $.store.get(MODE_KEY)
     if (mode !== 'off') {
       shown = undefined
@@ -121,8 +125,24 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // đầu mỗi lượt đặt lại cảnh: app bỏ qua cảnh đặt trước khi cửa sổ gắn vào phiên (phiên mới, sau /clear)
+  on('prompt.submit', async ($, e, next) => {
+    // hook này chặn được lượt gửi: lỗi của nền / pet không được làm hỏng tin nhắn
+    await (async () => {
+      if (!await inApp($)) return
+      restId += 1
+      await update($, pose, () => 'charge')
+      const mode = await $.store.get(MODE_KEY)
+      if (mode === 'off') return
+      shown = undefined
+      await setScene($, sceneFor(mode))
+    })().catch(() => undefined)
+    return next(e)
+  })
+
   // mỗi lần gửi model một yêu cầu: đổi cảnh theo effort của lượt, trừ khi đã tắt hoặc giữ một mức
   on('turn.step', async function* ($, e, next) {
+    if (!await inApp($)) return yield* next(e)
     if (typeof e.effort === 'string') await update($, level, () => e.effort as string)
     const mode = await $.store.get(MODE_KEY)
     if (mode === undefined) {
@@ -138,18 +158,21 @@ export const register: Register = on => {
   // ghi/sửa file: bắn chưởng; công cụ khác (đọc, chạy lệnh, tìm...): đấm hai phát; xong thì về gồng ki
   on('tool.call', async ($, e, next) => {
     const result = await next(e)
-    const hit: Pose = WRITES.includes(e.tool) ? 'blast' : 'punch'
-    const was = await read($, pose)
-    if (hit === 'punch' && was === 'blast') return result  // đang bắn chưởng thì không cắt ngang
-    await update($, pose, () => hit)
-    void (async () => {
-      await $.clock.sleep(hit === 'blast' ? BLAST_MS : PUNCH_MS)
-      await update($, pose, now => (now === hit ? 'charge' : now))
-    })()
+    // chỉ là hoạt hình: lỗi ở đây không được đổi kết quả của công cụ
+    await (async () => {
+      if (!await inApp($)) return
+      const hit: Pose = WRITES.includes(e.tool) ? 'blast' : 'punch'
+      if (hit === 'punch' && await read($, pose) === 'blast') return  // đang bắn chưởng thì không cắt ngang
+      await update($, pose, () => hit)
+      void $.clock.sleep(hit === 'blast' ? BLAST_MS : PUNCH_MS)
+        .then(() => update($, pose, now => (now === hit ? 'charge' : now)))
+        .catch(() => undefined)
+    })().catch(() => undefined)
     return result
   })
 
   on('turn.complete', async ($, e, next) => {
+    if (!await inApp($)) return next(e)
     await update($, pose, () => 'idle')
     const mine = ++restId
     void (async () => {
@@ -187,7 +210,7 @@ export const register: Register = on => {
     }
     if (word === 'off') {
       await $.store.set(MODE_KEY, 'off')
-      await clearScene($)
+      if (await inApp($)) await clearScene($)
       return { text: 'Dragon-ball backdrop off. /dragonball turns it back on.' }
     }
     if (word !== '' && !LEVELS.includes(word)) {
@@ -195,6 +218,7 @@ export const register: Register = on => {
     }
     if (word === '') await $.store.delete(MODE_KEY)
     else await $.store.set(MODE_KEY, word)
+    if (!await inApp($)) return { text: 'Saved. The dragon-ball backdrop and pet show in the Claude desktop app; in the terminal the theme is /theme.' }
     shown = undefined
     const set = await setScene($, sceneFor(word || undefined))
     const said = word === '' ? 'Dragon-ball backdrop follows the effort level.' : `Dragon-ball backdrop pinned to ${word}.`

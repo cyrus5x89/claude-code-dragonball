@@ -101,6 +101,8 @@ function css(pose: Pose, fps: number): string {
 }
 
 type Sprite = { w: number; h: number; d: string }
+/** Hình thứ i của một tấm hiệu ứng (các tấm sinh sẵn, chỉ số luôn có). */
+const fx = (sheet: string, i: number): Sprite => FX[sheet]![i]!
 /** Một hình hiệu ứng (art/fx) cao h đơn vị, góc trên trái ở (x, y); lớp bọc g để CSS xoay/phóng quanh chính nó. */
 function sp(f: Sprite, x: number, y: number, h: number, cls: string, style = '', w = h * f.w / f.h): string {
   return `<g class="${cls}" style="transform-box:fill-box;transform-origin:center;${style}"><svg x="${x}" y="${y}" width="${w.toFixed(1)}" height="${h}" ` +
@@ -114,12 +116,12 @@ const BOLTS: [number, number, number, number, number][] = [[1, 4, 10, 22, -15], 
 // đá bay khi gồng: [hình, x, độ trễ]
 const ROCKS: [number, number, number][] = [[1, 10, 0], [4, 24, 0.5], [2, 46, 0.25], [6, 60, 0.8], [0, 34, 1.05]]
 // cú đấm: 4 khung (tia nhỏ, sao nổ, vụ nổ văng mảnh, vòng khói) x 2 cú, theo % thời lượng PUNCH_MS
-const HITS = [[8, 12, 18, 26, 38], [40, 44, 50, 58, 72]]
+const HITS: [number, number, number, number, number][] = [[8, 12, 18, 26, 38], [40, 44, 50, 58, 72]]
 
 /** Keyframes cho khung thứ k của cú đấm: hiện bằng cách phóng to (không mờ dần), tắt bằng cách thu về 0. */
 function hitFrame(k: number): string {
-  const steps = HITS.flatMap(([...t]) => {
-    const s = t[k], e = t[k + 1]
+  const steps = HITS.flatMap(t => {
+    const s = t[k]!, e = t[k + 1]!
     return k === 3
       ? [`${s - 0.1}%{transform:scale(0)}`, `${s}%{transform:scale(.8);opacity:1}`, `${e}%{transform:scale(1.35);opacity:0}`, `${e + 0.1}%{transform:scale(0)}`]
       : [`${s - 0.1}%{transform:scale(0)}`, `${s}%{transform:scale(.6)}`, `${(s + e) / 2}%{transform:scale(1.1)}`, `${e}%{transform:scale(1)}`, `${e + 0.1}%{transform:scale(0)}`]
@@ -131,44 +133,44 @@ function hitFrame(k: number): string {
 // x0: cắt bỏ phần trái của dải (lật thì đó là chỗ trống trước mặt), để khung chỉ ôm con Claude khi không bắn chưởng
 export function petSvg(level: string, pose: Pose, fps = 24, flip = false, x0 = 0): string {
   const color = AURA[level] ?? '#D97757'
-  const m = MASCOTS[level] ?? MASCOTS.low
+  const m = MASCOTS[level] ?? MASCOTS.low!
   const a = (name: string, s: number, ease: string, rest?: string) => anim(fps, name, s, ease, rest)
   const parts: string[] = []
   let extra = ''
   if (pose === 'idle') parts.push('<ellipse class="aura" cx="40" cy="52" rx="40" ry="44" fill="url(#glow)"/>')
   if (ELECTRIC.includes(level) && pose !== 'sleep') {
-    parts.push(...ARCS.map(([f, x, y, h, r], i) => sp(FX.bolts[f], x, y, h, 'arc', `animation-delay:-${(i * 0.41) % 1.2}s;rotate:${r}deg`)))
+    parts.push(...ARCS.map(([f, x, y, h, r], i) => sp(fx('bolts', f), x, y, h, 'arc', `animation-delay:-${(i * 0.41) % 1.2}s;rotate:${r}deg`)))
   }
   if (pose === 'charge') {
     if (SPARKY.includes(level)) {
-      parts.push(...BOLTS.map(([f, x, y, h, r], i) => sp(FX.bolts[f], x, y, h, 'bolt', `animation-delay:-${i * 0.23}s;rotate:${r}deg`)))
+      parts.push(...BOLTS.map(([f, x, y, h, r], i) => sp(fx('bolts', f), x, y, h, 'bolt', `animation-delay:-${i * 0.23}s;rotate:${r}deg`)))
     }
-    parts.push(...ROCKS.map(([f, x, d]) => sp(FX.debris[f], x, 78, 9, 'rock', `animation-delay:-${d}s`)))
+    parts.push(...ROCKS.map(([f, x, d]) => sp(fx('debris', f), x, 78, 9, 'rock', `animation-delay:-${d}s`)))
     // bụi bung ra hai bên chân lúc ngồi thụp lấy đà
-    parts.push(...[[-6, -1], [6, -1], [62, 1], [74, 1]].map(([x, dir], i) =>
-      sp(FX.debris[8 + i], x, 78, 9, 'dust', `--dx:${dir * 8}px`)))
+    parts.push(...([[-6, -1], [6, -1], [62, 1], [74, 1]] as const).map(([x, dir], i) =>
+      sp(fx('debris', 8 + i), x, 78, 9, 'dust', `--dx:${dir * 8}px`)))
     extra += `.dust{animation:${a('dust', 0.9, 'cubic-bezier(.16,1,.3,1)', 'both')}}` +
       '@keyframes dust{0%{transform:scale(0)}18%{transform:translateX(calc(var(--dx)*.4)) scale(1.1)}100%{transform:translate(var(--dx),-3px) scale(0)}}'
   }
   if (pose === 'punch') {
     parts.push('<g class="speed" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".8"><path d="M78,40 H104"/><path d="M80,52 H112"/><path d="M78,64 H100"/></g>')
-    parts.push(...[16, 26, 30, 34].map((h, k) => sp(FX.impact[k], 101 - h * FX.impact[k].w / FX.impact[k].h / 2, 50 - h / 2, h, `f f${k}`)))
+    parts.push(...[16, 26, 30, 34].map((h, k) => sp(fx('impact', k), 101 - h * fx('impact', k).w / fx('impact', k).h / 2, 50 - h / 2, h, `f f${k}`)))
     extra += [0, 1, 2, 3].map(k => `.f${k}{animation:${a(`f${k}`, PUNCH_MS / 1000, 'linear', 'both')}}${hitFrame(k)}`).join('')
   }
   if (pose === 'blast') {
-    parts.push(sp(FX.beam[1], 64, 38, 28, 'beam', 'transform-origin:left center', 310),
-      sp(FX.beam[0], 56, 35, 34, 'orb'))
+    parts.push(sp(fx('beam', 1), 64, 38, 28, 'beam', 'transform-origin:left center', 310),
+      sp(fx('beam', 0), 56, 35, 34, 'orb'))
   }
   if (pose === 'sleep') {
     // bong bóng ngủ phồng xẹp theo nhịp thở ở mũi
-    parts.push(sp(FX.sleep[3], 60, 40, 18, 'bubble'))
+    parts.push(sp(fx('sleep', 3), 60, 40, 18, 'bubble'))
     extra += `.bubble{animation:${a('bubble', 5, 'ease-in-out', 'infinite')}}` +
       '@keyframes bubble{0%,100%{transform:scale(.35)}50%{transform:scale(1)}92%{transform:scale(1.15)}94%{transform:scale(0)}}'
   }
   const zzz = pose === 'sleep'
-    ? [[0, 11, 0], [1, 15, 1], [2, 19, 2]].map(([f, h, d]) => {
-      const w = h * FX.sleep[f].w / FX.sleep[f].h
-      return sp(FX.sleep[f], flip ? 380 - 60 - w : 60, 0, h, 'z', `animation-delay:-${d}s;opacity:0`)
+    ? ([[0, 11, 0], [1, 15, 1], [2, 19, 2]] as const).map(([f, h, d]) => {
+      const w = h * fx('sleep', f).w / fx('sleep', f).h
+      return sp(fx('sleep', f), flip ? 380 - 60 - w : 60, 0, h, 'z', `animation-delay:-${d}s;opacity:0`)
     }).join('')
     : ''
   // gồng ki và bắn chưởng: thay viền hào quang có sẵn bằng hào quang vẽ riêng (art/fx/aura-*.png), bung to sau lưng
