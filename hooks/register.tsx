@@ -4,7 +4,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import { BLAST_MS, FPS, petSvg, sceneAtFps } from './pet'
+import { BLAST_MS, FPS, PUNCH_MS, petSvg, sceneAtFps } from './pet'
 import type { Pose } from '../types'
 import { SCENES } from './scenes'
 
@@ -21,11 +21,18 @@ type AnyEngine = {
   ui: { toast(text: string): Promise<unknown>; backdrop?(args: unknown): Promise<Answer> }
 }
 
-// con pet cạnh ô chat: dáng (nghỉ / gồng ki / bắn chưởng) và mức effort để chọn con Claude nào
+// con pet cạnh ô chat: dáng (thở / ngủ / gồng ki / đấm / bắn chưởng) và mức effort để chọn con Claude nào
 const pose = atom({ plugin: 'dragonball', key: 'pose' } as const, 'idle' as Pose)
 const level = atom({ plugin: 'dragonball', key: 'level' } as const, 'low')
 // công cụ ghi file: xong một cái là bắn chưởng
 const WRITES = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit']
+// nghỉ quá lâu thì ngủ
+const SLEEP_AFTER_MS = 90_000
+// mỗi lần nghỉ một số mới: hẹn giờ ngủ của lần nghỉ cũ thấy số khác thì thôi
+let restId = 0
+const ALT: Record<string, string> = {
+  idle: 'resting', sleep: 'asleep', charge: 'charging ki', punch: 'punching', blast: 'firing a beam',
+}
 // $.store 'fps': 12 / 24 / 60 khung hình mỗi giây cho mọi animation, mặc định 24
 const FPS_KEY = 'fps'
 const DEFAULT_FPS = 24
@@ -100,6 +107,7 @@ export const register: Register = on => {
 
   // đầu mỗi lượt đặt lại cảnh: app bỏ qua cảnh đặt trước khi cửa sổ gắn vào phiên (phiên mới, sau /clear)
   on('prompt.submit', async ($, e, next) => {
+    restId += 1
     await update($, pose, () => 'charge')
     const mode = await $.store.get(MODE_KEY)
     if (mode !== 'off') {
@@ -127,20 +135,27 @@ export const register: Register = on => {
     return yield* next(e)
   })
 
+  // ghi/sửa file: bắn chưởng; công cụ khác (đọc, chạy lệnh, tìm...): đấm hai phát; xong thì về gồng ki
   on('tool.call', async ($, e, next) => {
     const result = await next(e)
-    if (WRITES.includes(e.tool)) {
-      await update($, pose, () => 'blast')
-      void (async () => {
-        await $.clock.sleep(BLAST_MS)
-        await update($, pose, was => (was === 'blast' ? 'charge' : was))
-      })()
-    }
+    const hit: Pose = WRITES.includes(e.tool) ? 'blast' : 'punch'
+    const was = await read($, pose)
+    if (hit === 'punch' && was === 'blast') return result  // đang bắn chưởng thì không cắt ngang
+    await update($, pose, () => hit)
+    void (async () => {
+      await $.clock.sleep(hit === 'blast' ? BLAST_MS : PUNCH_MS)
+      await update($, pose, now => (now === hit ? 'charge' : now))
+    })()
     return result
   })
 
   on('turn.complete', async ($, e, next) => {
     await update($, pose, () => 'idle')
+    const mine = ++restId
+    void (async () => {
+      await $.clock.sleep(SLEEP_AFTER_MS)
+      if (mine === restId) await update($, pose, now => (now === 'idle' ? 'sleep' : now))
+    })()
     return next(e)
   })
 
@@ -153,9 +168,12 @@ export const register: Register = on => {
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
     const now = await read($, pose)
     const { Box, Svg } = $.ui.resolve(e)
+    // dải này app tự bọc trong một thẻ xám: giữ dải thấp, cho con Claude tràn xuống ngồi lên mép trên ô chat
     return (
-      <Box flexDirection="row" justifyContent="flex-end">
-        <Svg isInteractive key={now} width={152} height={38} alt={`Claude ${now === 'idle' ? 'resting' : now === 'charge' ? 'charging ki' : 'firing a beam'}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
+      <Box position="relative" height={6}>
+        <Box position="absolute" right={6} bottom={-44}>
+          <Svg isInteractive key={now} width={266} height={76} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
+        </Box>
       </Box>
     )
   })

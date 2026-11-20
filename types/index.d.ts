@@ -1,4 +1,4 @@
-export type Pose = 'idle' | 'charge' | 'blast'
+export type Pose = 'idle' | 'sleep' | 'charge' | 'punch' | 'blast'
 
 declare module 'claude-code' {
   interface PluginState {
