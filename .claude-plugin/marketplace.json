@@ -1,0 +1,14 @@
+{
+  "name": "claude-code-dragonball",
+  "owner": {
+    "name": "cyrus5x89"
+  },
+  "plugins": [
+    {
+      "name": "dragonball",
+      "source": "./",
+      "description": "Claude Dragonball theme + spinner verbs"
+    }
+  ],
+  "description": "Claude Dragonball theme for Claude Code"
+}
