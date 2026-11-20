@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: square post 1:1
+Primary request: Sprite sheet for a Kamehameha energy attack: top half, a round charging energy orb, white core with cyan and blue spiky energy rays around it; bottom half, one long horizontal energy beam segment with a white core band, cyan and deep blue layered outer bands and a wavy flame-like outer edge, flat colour bands. Flat 2D cel-shaded game sprite art matching the mascot in Image 1: thick clean black ink outlines, flat colour fills with at most one shade tone, no gradients, no soft glow, no blur. Background: solid flat pure magenta #FF00FF everywhere, no shadows or texture on the background. Every sprite separate with wide magenta gaps, nothing touching the image edges. Do not draw the mascot itself.
+Input images: Image 1: reference
+Style/medium: stylized concept render
+Composition/framing: aspect ratio 1:1
+Constraints: no text in the image

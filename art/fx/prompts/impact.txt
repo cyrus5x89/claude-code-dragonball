@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: square post 1:1
+Primary request: Sprite sheet of 4 separate punch impact effects in a 2 by 2 grid, the frames of one hit growing in size: a small spark star; a big spiky comic impact star, white centre, yellow then orange edge; an exploding burst with flying shards; a breaking ring of smoke puffs. Flat 2D cel-shaded game sprite art matching the mascot in Image 1: thick clean black ink outlines, flat colour fills with at most one shade tone, no gradients, no soft glow, no blur. Background: solid flat pure magenta #FF00FF everywhere, no shadows or texture on the background. Every sprite separate with wide magenta gaps, nothing touching the image edges. Do not draw the mascot itself.
+Input images: Image 1: reference
+Style/medium: stylized concept render
+Composition/framing: aspect ratio 1:1
+Constraints: no text in the image

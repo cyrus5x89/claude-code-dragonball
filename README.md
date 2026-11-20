@@ -29,13 +29,13 @@ Then send any message: the backdrop and the pet appear with the first turn.
 - `/dragonball off` turns the backdrop and the pet off
 - `/dragonball fps 12`, `24` (default) or `60`: frame rate of every animation; lower costs less GPU
 
-**The pet.** Each mascot is split into three layers (ki aura, hair, body) that move on their own: the body breathes, the hair sways a beat later, the aura pulses. Low and medium have no aura of their own, so electricity crackles around them instead.
+**The pet.** Each mascot is split into three layers (ki aura, hair, body) that move on their own: the body breathes, the hair sways a beat later, the aura pulses. Low and medium have no aura of their own, so electricity crackles around them instead. The effects (lightning, impact bursts, Kamehameha orb and beam, rocks, dust, Zzz, sleep bubble) are drawn with `studio image` as sprite sheets in `art/fx/` (prompts in `art/fx/prompts/`), then cut and traced to vectors by `make_scenes.py`.
 
 ![Poses](docs/poses.png)
 
-- **idle**: breathing; after 90 s idle it falls asleep (head down, Zzz)
-- **charge** while Claude works: hair stands up and trembles, the aura surges, lightning from medium up, rocks lift off the ground
-- **punch** on each read, search or command: two jabs, the hair whips back, impact bursts
+- **idle**: breathing; after 90 s idle it falls asleep (head down, Zzz, a sleep bubble)
+- **charge** while Claude works: dust bursts at its feet, hair stands up and trembles, the aura surges, lightning from medium up, rocks lift off the ground
+- **punch** on each read, search or command: two jabs, each a four-frame impact (spark, star, burst, smoke ring), the hair whips back
 - **blast** on each Write / Edit: gathers ki, then fires a beam across the bar
 
 ![Blast](docs/blast.png)

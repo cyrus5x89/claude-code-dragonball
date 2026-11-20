@@ -5,7 +5,7 @@
 //   punch  dùng công cụ (đọc, chạy lệnh, tìm): đấm hai phát, nổ va chạm · blast  ghi/sửa file: gom chưởng rồi bắn
 // Một dải SVG có CSS animation (Svg isInteractive mới chạy animation).
 // fps: 60 mượt (giữ easing), 24 / 12 nhảy theo khung hình bằng steps() để đỡ tốn máy.
-import { AURA, MASCOTS } from './scenes'
+import { AURA, FX, MASCOTS } from './scenes'
 
 import type { Pose } from '../types'
 export type { Pose }
@@ -39,16 +39,16 @@ function css(pose: Pose, fps: number): string {
         '@keyframes sway{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-2px) rotate(-1.5deg)}50%{transform:translateY(-3px) rotate(0)}70%{transform:translateY(-2px) rotate(1.5deg)}}' +
         `.ki{${MID};animation:${a('pulse', 1.8, 'ease-in-out', 'infinite')}}` +
         '@keyframes pulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.04,1.06);opacity:1}}' +
-        `.arc{opacity:0;animation:${a('zap', 1.6, 'linear', 'infinite')}}` +
-        '@keyframes zap{0%,6%{opacity:0}7%,12%{opacity:1}13%,100%{opacity:0}}' +
+        `.arc{opacity:0;animation:${a('zap', 1.2, 'linear', 'infinite')}}` +
+        '@keyframes zap{0%,6%{opacity:0}7%,20%{opacity:1}21%,100%{opacity:0}}' +
         `.aura{transform-origin:40px 52px;animation:${a('glow', 3.6, 'ease-in-out', 'infinite')}}` +
         '@keyframes glow{0%,100%{opacity:.14;transform:scale(.9)}50%{opacity:.28;transform:scale(1)}}'
     case 'sleep':
       return `.me{transform-origin:40px 86px;animation:${a('doze', 5, 'ease-in-out', 'infinite')}}` +
         '@keyframes doze{0%,100%{transform:translateY(3px) rotate(-7deg) scale(1,.97)}50%{transform:translateY(3px) rotate(-7deg) scale(1.01,1.01)}}' +
         `.hair{${ROOT};transform:rotate(-3deg) scale(1,.95)}.ki{opacity:.3}` +
-        `.z{animation:${a('zzz', 3, 'ease-out', 'infinite')};opacity:0}` +
-        '@keyframes zzz{0%{transform:translate(0,0) scale(.6);opacity:0}20%{opacity:.9}100%{transform:translate(18px,-30px) scale(1.3);opacity:0}}'
+        `.z{animation:${a('zzz', 3, 'ease-out', 'infinite')}}` +
+        '@keyframes zzz{0%{transform:translate(0,0) scale(.6);opacity:0}20%{opacity:1}100%{transform:translate(18px,-30px) scale(1.3);opacity:0}}'
     case 'charge':
       // ngồi thụp lấy đà rồi rung; lửa ki hai lớp lệch nhịp bốc lên; sét chớp; đá dưới chân bay lên
       return `.me{transform-origin:40px 86px;animation:${a('crouch', 0.45, 'ease-out', 'both')},${a('shake', 0.1, 'linear', '.45s infinite')}}` +
@@ -69,8 +69,6 @@ function css(pose: Pose, fps: number): string {
       // hai cú đấm thẳng về phía trước (lật thì sang trái), mỗi cú một vụ nổ va chạm và vệt tốc độ
       return `.me{transform-origin:40px 86px;animation:${a('jab', PUNCH_MS / 1000, 'cubic-bezier(.3,1.6,.4,1)', 'both')}}` +
         '@keyframes jab{0%{transform:translateX(0)}12%{transform:translateX(14px) scale(1.04,.97)}24%{transform:translateX(0)}44%{transform:translateX(16px) scale(1.05,.96)}58%,100%{transform:translateX(0)}}' +
-        `.hit{transform-origin:100px 50px;opacity:0;animation:${a('hit', PUNCH_MS / 1000, 'ease-out', 'both')}}` +
-        '@keyframes hit{0%,8%{transform:scale(.2);opacity:0}13%{transform:scale(1.1);opacity:1}22%{transform:scale(1.3);opacity:0}40%{transform:scale(.2);opacity:0}45%{transform:scale(1.3);opacity:1}56%,100%{transform:scale(1.5);opacity:0}}' +
         `.speed{opacity:0;animation:${a('speed', PUNCH_MS / 1000, 'linear', 'both')}}` +
         '@keyframes speed{0%,8%{opacity:0}12%{opacity:.8}24%{opacity:0}40%{opacity:0}44%{opacity:.8}56%,100%{opacity:0}}' +
         // tóc văng ngược chiều cú đấm, trễ 2 khung sau thân
@@ -85,12 +83,10 @@ function css(pose: Pose, fps: number): string {
       const t = BLAST_MS / 1000
       return `.me{transform-origin:40px 86px;animation:${a('recoil', t, 'ease-out', 'both')}}` +
         '@keyframes recoil{0%{transform:translateX(2px)}28%{transform:translateX(4px) scale(1.04,.96)}34%{transform:translateX(-5px)}60%{transform:translateX(-2px)}100%{transform:translateX(0)}}' +
-        `.orb{transform-origin:72px 52px;animation:${a('orb', t, 'ease-out', 'both')}}` +
+        `.orb{animation:${a('orb', t, 'ease-out', 'both')}}` +
         '@keyframes orb{0%{transform:scale(.2);opacity:.6}28%{transform:scale(1.5);opacity:1}40%{transform:scale(1)}80%{transform:scale(.9);opacity:.9}100%{transform:scale(.2);opacity:0}}' +
-        `.beam{transform-origin:72px 52px;animation:${a('fire', t, 'cubic-bezier(.2,.8,.2,1)', 'both')}}` +
+        `.beam{animation:${a('fire', t, 'cubic-bezier(.2,.8,.2,1)', 'both')}}` +
         '@keyframes fire{0%,28%{transform:scale(0,1);opacity:1}42%{transform:scale(1,1.2)}50%{transform:scale(1,.9)}58%{transform:scale(1,1.12)}75%{transform:scale(1,1);opacity:1}100%{transform:scale(1,.2);opacity:0}}' +
-        `.flash{animation:${a('flash', t, 'ease-out', 'both')}}` +
-        '@keyframes flash{0%,30%{opacity:0}34%{opacity:.45}50%,100%{opacity:0}}' +
         // lúc bắn: tóc hất ngược và dựng, hào quang phồng to rồi xẹp dần
         `.hair{${ROOT};animation:${a('blow', t, 'ease-out', 'both')}}` +
         '@keyframes blow{0%{transform:scale(1)}28%{transform:translateY(-3px) scale(1.04,1.1)}34%{transform:rotate(-8deg) translate(-4px,-3px) scale(1.04,1.12)}75%{transform:rotate(-5deg) translate(-3px,-2px) scale(1.03,1.08)}100%{transform:none}}' +
@@ -102,54 +98,83 @@ function css(pose: Pose, fps: number): string {
   }
 }
 
-const BOLTS = ['M14,20 L22,34 L16,36 L26,52', 'M66,16 L58,30 L65,32 L54,48', 'M8,58 L18,64 L12,68 L22,78']
-// điện quanh người cho low / medium: các tia gấp khúc ôm sát viền (toạ độ dải 80 đơn vị)
-const ARCS = ['M6,30 L12,38 L7,42 L14,50', 'M74,28 L68,36 L73,40 L66,48', 'M22,12 L28,20 L24,22 L31,28', 'M58,10 L52,18 L57,21 L50,27',
-  'M4,62 L11,66 L6,71 L13,76', 'M76,60 L69,65 L74,69 L67,75']
-const ROCKS = [[16, 0], [30, 0.5], [52, 0.25], [64, 0.8]]
+type Sprite = { w: number; h: number; d: string }
+/** Một hình hiệu ứng (art/fx) cao h đơn vị, góc trên trái ở (x, y); lớp bọc g để CSS xoay/phóng quanh chính nó. */
+function sp(f: Sprite, x: number, y: number, h: number, cls: string, style = '', w = h * f.w / f.h): string {
+  return `<g class="${cls}" style="transform-box:fill-box;transform-origin:center;${style}"><svg x="${x}" y="${y}" width="${w.toFixed(1)}" height="${h}" ` +
+    `viewBox="0 0 ${f.w} ${f.h}" preserveAspectRatio="none">${f.d}</svg></g>`
+}
+
+// sét quanh người: [hình, x, y, cao, góc] trong dải 80 đơn vị (mascot nằm ở x 4-76, y 14-86)
+const ARCS: [number, number, number, number, number][] = [[0, 0, 24, 28, -10], [2, 62, 20, 28, 12], [1, 14, 4, 24, -25], [3, 50, 2, 24, 20],
+  [4, -2, 52, 24, 30], [5, 64, 50, 24, -30]]
+const BOLTS: [number, number, number, number, number][] = [[1, 4, 10, 22, -15], [3, 60, 8, 22, 15], [5, 2, 54, 20, 25]]
+// đá bay khi gồng: [hình, x, độ trễ]
+const ROCKS: [number, number, number][] = [[1, 10, 0], [4, 24, 0.5], [2, 46, 0.25], [6, 60, 0.8], [0, 34, 1.05]]
+// cú đấm: 4 khung (tia nhỏ, sao nổ, vụ nổ văng mảnh, vòng khói) x 2 cú, theo % thời lượng PUNCH_MS
+const HITS = [[8, 12, 18, 26, 38], [40, 44, 50, 58, 72]]
+
+/** Keyframes cho khung thứ k của cú đấm: hiện bằng cách phóng to (không mờ dần), tắt bằng cách thu về 0. */
+function hitFrame(k: number): string {
+  const steps = HITS.flatMap(([...t]) => {
+    const s = t[k], e = t[k + 1]
+    return k === 3
+      ? [`${s - 0.1}%{transform:scale(0)}`, `${s}%{transform:scale(.8);opacity:1}`, `${e}%{transform:scale(1.35);opacity:0}`, `${e + 0.1}%{transform:scale(0)}`]
+      : [`${s - 0.1}%{transform:scale(0)}`, `${s}%{transform:scale(.6)}`, `${(s + e) / 2}%{transform:scale(1.1)}`, `${e}%{transform:scale(1)}`, `${e + 0.1}%{transform:scale(0)}`]
+  })
+  return `@keyframes f${k}{0%{transform:scale(0)}${steps.join('')}100%{transform:scale(0)}}`
+}
 
 // flip: lật ngang (Claude ở mép phải, chưởng và cú đấm hướng sang trái)
 // x0: cắt bỏ phần trái của dải (lật thì đó là chỗ trống trước mặt), để khung chỉ ôm con Claude khi không bắn chưởng
 export function petSvg(level: string, pose: Pose, fps = 24, flip = false, x0 = 0): string {
   const color = AURA[level] ?? '#D97757'
   const m = MASCOTS[level] ?? MASCOTS.low
+  const a = (name: string, s: number, ease: string, rest?: string) => anim(fps, name, s, ease, rest)
   const parts: string[] = []
+  let extra = ''
   if (pose === 'idle') parts.push('<ellipse class="aura" cx="40" cy="52" rx="40" ry="44" fill="url(#glow)"/>')
   if (ELECTRIC.includes(level) && pose !== 'sleep') {
-    const tint = level === 'low' ? '#FFE680' : '#BFE8FF'
-    parts.push(...ARCS.map((d, i) => `<g class="arc" style="animation-delay:-${(i * 0.37) % 1.6}s" fill="none" stroke-linejoin="round" stroke-linecap="round">` +
-      `<path d="${d}" stroke="${tint}" stroke-width="3.2" opacity=".45"/><path d="${d}" stroke="#FFFFFF" stroke-width="1.2"/></g>`))
+    parts.push(...ARCS.map(([f, x, y, h, r], i) => sp(FX.bolts[f], x, y, h, 'arc', `animation-delay:-${(i * 0.41) % 1.2}s;rotate:${r}deg`)))
   }
   if (pose === 'charge') {
     if (SPARKY.includes(level)) {
-      parts.push(...BOLTS.map((d, i) => `<path class="bolt" style="animation-delay:-${i * 0.23}s" d="${d}" fill="none" stroke="#E8F6FF" stroke-width="2.2" stroke-linejoin="round"/>`))
+      parts.push(...BOLTS.map(([f, x, y, h, r], i) => sp(FX.bolts[f], x, y, h, 'bolt', `animation-delay:-${i * 0.23}s;rotate:${r}deg`)))
     }
-    parts.push(...ROCKS.map(([x, d]) => `<path class="rock" style="animation-delay:-${d}s;transform-box:fill-box;transform-origin:center" d="M${x},84 l4,-3 l4,2 l-1,4 l-5,1 z" fill="#8A847D"/>`))
+    parts.push(...ROCKS.map(([f, x, d]) => sp(FX.debris[f], x, 78, 9, 'rock', `animation-delay:-${d}s`)))
+    // bụi bung ra hai bên chân lúc ngồi thụp lấy đà
+    parts.push(...[[-6, -1], [6, -1], [62, 1], [74, 1]].map(([x, dir], i) =>
+      sp(FX.debris[8 + i], x, 78, 9, 'dust', `--dx:${dir * 8}px`)))
+    extra += `.dust{animation:${a('dust', 0.9, 'cubic-bezier(.16,1,.3,1)', 'both')}}` +
+      '@keyframes dust{0%{transform:scale(0)}18%{transform:translateX(calc(var(--dx)*.4)) scale(1.1)}100%{transform:translate(var(--dx),-3px) scale(0)}}'
   }
   if (pose === 'punch') {
-    parts.push('<g class="speed" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".8"><path d="M78,40 H104"/><path d="M80,52 H112"/><path d="M78,64 H100"/></g>',
-      '<path class="hit" d="M100,34 L104,45 L116,42 L107,51 L118,59 L105,58 L102,70 L97,58 L85,61 L93,51 L84,43 L96,45 Z" fill="#FFE066" stroke="#FFFFFF" stroke-width="1.5"/>')
+    parts.push('<g class="speed" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".8"><path d="M78,40 H104"/><path d="M80,52 H112"/><path d="M78,64 H100"/></g>')
+    parts.push(...[16, 26, 30, 34].map((h, k) => sp(FX.impact[k], 101 - h * FX.impact[k].w / FX.impact[k].h / 2, 50 - h / 2, h, `f f${k}`)))
+    extra += [0, 1, 2, 3].map(k => `.f${k}{animation:${a(`f${k}`, PUNCH_MS / 1000, 'linear', 'both')}}${hitFrame(k)}`).join('')
   }
   if (pose === 'blast') {
-    parts.push('<rect class="flash" x="0" y="-20" width="380" height="106" rx="12" fill="#BFF3FF" opacity="0"/>',
-      '<g class="beam"><rect x="70" y="41" width="300" height="22" rx="11" fill="url(#beam)"/><rect x="70" y="48" width="300" height="8" rx="4" fill="url(#core)"/></g>',
-      '<g class="orb"><circle cx="72" cy="52" r="15" fill="url(#orbg)"/><circle cx="72" cy="52" r="6" fill="#fff"/></g>')
+    parts.push(sp(FX.beam[1], 64, 38, 28, 'beam', 'transform-origin:left center', 310),
+      sp(FX.beam[0], 56, 35, 34, 'orb'))
+  }
+  if (pose === 'sleep') {
+    // bong bóng ngủ phồng xẹp theo nhịp thở ở mũi
+    parts.push(sp(FX.sleep[3], 60, 40, 18, 'bubble'))
+    extra += `.bubble{animation:${a('bubble', 5, 'ease-in-out', 'infinite')}}` +
+      '@keyframes bubble{0%,100%{transform:scale(.35)}50%{transform:scale(1)}92%{transform:scale(1.15)}94%{transform:scale(0)}}'
   }
   const zzz = pose === 'sleep'
-    ? [['z', 9, 0], ['Z', 12, 1], ['Z', 15, 2]].map(([c, size, d]) =>
-      `<text class="z" style="animation-delay:-${d}s" x="62" y="22" font-size="${size}" font-weight="700" font-family="sans-serif" fill="#D8DEE9">${c}</text>`).join('')
+    ? [[0, 11, 0], [1, 15, 1], [2, 19, 2]].map(([f, h, d]) => {
+      const w = h * FX.sleep[f].w / FX.sleep[f].h
+      return sp(FX.sleep[f], flip ? 380 - 60 - w : 60, 0, h, 'z', `animation-delay:-${d}s;opacity:0`)
+    }).join('')
     : ''
   const me = `<g class="me"><svg x="4" y="14" width="72" height="72" viewBox="0 0 224 224" overflow="visible">` +
     `<g class="ki">${m.aura}</g><g class="hair">${m.hair}</g><g class="bod">${m.body}</g></svg></g>`
-  // Zzz không lật để chữ đọc xuôi: đặt ngoài nhóm lật, toạ độ tính lại
-  const zzzOut = flip ? zzz.replace(/x="62"/g, 'x="300"') : zzz
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} -20 ${380 - x0} 106" width="${380 - x0}" height="106"><style>${css(pose, fps)} ${STILL}</style><defs>` +
-    `<radialGradient id="glow"><stop offset="0" stop-color="${color}" stop-opacity=".9"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient>` +
-    '<radialGradient id="orbg"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#9FE8FF"/><stop offset="1" stop-color="#4FB8FF" stop-opacity="0"/></radialGradient>' +
-    '<linearGradient id="beam" x1="0" x2="1"><stop offset="0" stop-color="#9FE8FF"/><stop offset=".7" stop-color="#4FB8FF"/><stop offset="1" stop-color="#4FB8FF" stop-opacity="0"/></linearGradient>' +
-    '<linearGradient id="core" x1="0" x2="1"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>' +
-    `<g${flip ? ' transform="translate(380 0) scale(-1 1)"' : ''}>${parts.join('')}${me}</g>${flip ? zzzOut : ''}` +
-    `${flip ? '' : zzz}</svg>`
+  // Zzz không lật để chữ đọc xuôi: đặt ngoài nhóm lật
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} -20 ${380 - x0} 106" width="${380 - x0}" height="106"><style>${css(pose, fps)}${extra} ${STILL}</style><defs>` +
+    `<radialGradient id="glow"><stop offset="0" stop-color="${color}" stop-opacity=".9"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient></defs>` +
+    `<g${flip ? ' transform="translate(380 0) scale(-1 1)"' : ''}>${parts.join('')}${me}</g>${zzz}</svg>`
 }
 
 /** Cảnh nền cũng có animation (ngọc nhấp nháy, hào quang thở): đổi easing theo fps như trên. */

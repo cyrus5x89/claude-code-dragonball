@@ -118,6 +118,49 @@ def layers(level):
     return out
 
 
+def fx_sprites(sheet, size=120, grid=None):
+    """Cắt từng hình trên tấm sprite (nền hồng tím của studio image) theo thứ tự hàng rồi cột, vẽ lại thành path.
+    grid=(hàng, cột): chia tấm theo lưới, mỗi ô một hình (khi một hình gồm nhiều mảnh rời như vòng khói).
+    size: cạnh dài mỗi hình sau khi thu nhỏ (một số, hoặc danh sách theo thứ tự hình).
+    Trả về [{w, h, d}]: d là các path trong viewBox 0 0 w h."""
+    im = Image.open(HERE / f"art/fx/{sheet}.png").convert("RGB")
+    a = np.asarray(im).astype(int)
+    # viền khử răng cưa trộn hồng tím: coi là nền luôn, để vtracer không ra màu bẩn ở mép
+    fg = nd.binary_opening(~((a[..., 0] - a[..., 1] > 60) & (a[..., 2] - a[..., 1] > 60)), iterations=2)
+    a[~fg] = KEY
+    im = Image.fromarray(a.astype(np.uint8))
+    # gom mảnh nhỏ sát nhau (tia lửa văng, nét nhánh sét) vào hình chính
+    if grid:
+        H, W = fg.shape
+        boxes = []
+        for r in range(grid[0]):
+            for c in range(grid[1]):
+                y0, x0 = r * H // grid[0], c * W // grid[1]
+                cell = fg[y0:(r + 1) * H // grid[0], x0:(c + 1) * W // grid[1]]
+                lab, n = nd.label(cell)  # bỏ mẩu của hình ô bên cạnh lấn qua mép ô
+                edge = set(np.unique(np.r_[lab[0], lab[-1], lab[:, 0], lab[:, -1]])) - {0}
+                cell = cell & ~np.isin(lab, [i for i in edge if (lab == i).sum() < 2000])
+                ys, xs = np.nonzero(cell)
+                boxes.append((slice(y0 + ys.min(), y0 + ys.max() + 1), slice(x0 + xs.min(), x0 + xs.max() + 1)))
+    else:
+        lab, n = nd.label(nd.binary_dilation(fg, iterations=14))
+        boxes = [b for b in nd.find_objects(lab) if (b[0].stop - b[0].start) * (b[1].stop - b[1].start) > 900]
+    rows = sorted(boxes, key=lambda b: b[0].start)
+    ordered, line = [], []
+    for b in rows:  # cùng hàng nếu tâm dọc gần nhau
+        if line and abs((b[0].start + b[0].stop) / 2 - (line[0][0].start + line[0][0].stop) / 2) > 120:
+            ordered += sorted(line, key=lambda b: b[1].start); line = []
+        line.append(b)
+    ordered += sorted(line, key=lambda b: b[1].start)
+    out = []
+    for i, b in enumerate(ordered if not grid else boxes):
+        crop = im.crop((b[1].start, b[0].start, b[1].stop, b[0].stop))
+        k = (size[i] if isinstance(size, list) else size) / max(crop.size)
+        crop = crop.resize((max(1, round(crop.width * k)), max(1, round(crop.height * k))), Image.LANCZOS)
+        out.append({"w": crop.width, "h": crop.height, "d": _trace(crop)})
+    return out
+
+
 _PATHS = {}
 
 
@@ -157,5 +200,10 @@ for k, v in scenes.items():
                                       "// SCENES: cảnh nền app; MASCOTS: path vector của Claude mỗi mức tách lớp aura / hair / body (viewBox 0 0 224 224), cho con pet cạnh ô chat\n"
                                       "export const SCENES: Record<string, string> = " + json.dumps(scenes) + "\n"
                                       "export const MASCOTS: Record<string, { aura: string; hair: string; body: string }> = " + json.dumps({lv: layers(lv) for lv in LEVELS}) + "\n"
-                                      "export const AURA: Record<string, string> = " + json.dumps(AURA) + "\n")
+                                      "export const AURA: Record<string, string> = " + json.dumps(AURA) + "\n"
+                                      "// FX: hiệu ứng vẽ bằng studio image (art/fx), cắt từng hình và vẽ lại thành path\n"
+                                      "export const FX: Record<string, { w: number; h: number; d: string }[]> = "
+                                      + json.dumps({"bolts": fx_sprites("bolts", 90), "impact": fx_sprites("impact", 90, grid=(2, 2)),
+                                                    "beam": fx_sprites("beam", [90, 260], grid=(2, 1)), "debris": fx_sprites("debris", 40),
+                                                    "sleep": fx_sprites("sleep", 60)}) + "\n")
 print({k: len(v) for k, v in scenes.items()})
