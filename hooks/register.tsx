@@ -81,6 +81,20 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // đầu mỗi lượt đặt lại cảnh: app bỏ qua cảnh đặt trước khi cửa sổ gắn vào phiên (phiên mới, sau /clear)
+  on('prompt.submit', async ($, e, next) => {
+    const mode = await $.store.get(MODE_KEY)
+    if (mode !== 'off') {
+      shown = undefined
+      try {
+        await setScene($, sceneFor(mode))
+      } catch {
+        // như trên
+      }
+    }
+    return next(e)
+  })
+
   // mỗi lần gửi model một yêu cầu: đổi cảnh theo effort của lượt, trừ khi đã tắt hoặc giữ một mức
   on('turn.step', async function* ($, e, next) {
     const mode = await $.store.get(MODE_KEY)
