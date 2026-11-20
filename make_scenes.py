@@ -2,7 +2,9 @@
 # python3 make_scenes.py
 import json, math, pathlib, re, subprocess, tempfile
 
+import numpy as np
 from PIL import Image
+from scipy import ndimage as nd
 
 HERE = pathlib.Path(__file__).parent
 LEVELS = ["low", "medium", "high", "xhigh", "max", "ultracode"]
@@ -55,6 +57,67 @@ def _mascot(level):
     return "".join(p for p in paths if not background(p))
 
 
+KEY = (255, 0, 255)  # màu đánh dấu ngoài lớp: vtracer vẽ nó thành path riêng, bỏ đi
+
+
+def split(level):
+    """Tách mascot thành 3 mặt nạ 224x224: aura (viền ki ngoài nét mực), hair, body (da cam, gồm nét mực của nó)."""
+    im = np.asarray(Image.open(HERE / f"art/mascot/claude-{level}.png").convert("RGB").resize((448, 448), Image.LANCZOS)) / 255
+    mx, mn = im.max(2), im.min(2)
+    sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0)
+    r, g, b = im[..., 0], im[..., 1], im[..., 2]
+    skin = nd.binary_opening((r > 0.55) & (g < 0.62) & (b < 0.45) & (r - g > 0.15) & (g - b > 0) & (sat > 0.3), iterations=2)
+    lab, n = nd.label(skin)
+    seed = lab == 1 + np.argmax(nd.sum(skin, lab, range(1, n + 1)))
+    # cơ bắp tô tối hơn: loang từ vùng da sáng qua các tông da tối (nét mực chặn lại)
+    lab, _ = nd.label(((r > 0.28) & (r - g > 0.1) & (g - b > -0.03) & (sat > 0.3)) | seed)
+    skin = np.isin(lab, list(set(np.unique(lab[seed])) - {0}))
+    body = nd.binary_fill_holes(nd.binary_closing(nd.binary_dilation(skin, iterations=3), iterations=8))
+    fg = mx > 0.16
+    hull = nd.binary_fill_holes(nd.binary_closing(fg, iterations=6))
+    core = nd.binary_opening(nd.binary_fill_holes(nd.binary_closing(((mx < 0.16) & hull) | body, iterations=3)), iterations=2)
+    hair = core & ~body
+    if level == "ultracode":  # hào quang trắng sáng lấp chỗ hở của nét mực: tóc bạc = các mảng xám dính vào thân
+        lab, _ = nd.label(nd.binary_opening((sat < 0.25) & (mx > 0.4) & (mx < 0.93) & ~body))
+        touch = list(set(np.unique(lab[nd.binary_dilation(body, iterations=6)])) - {0})
+        hair = nd.binary_fill_holes(nd.binary_closing(np.isin(lab, touch), iterations=3)) & ~body
+        core = hair | body
+    # tóc lót xuống dưới mép thân một chút để thân nhún không hở khe
+    hair = hair | (core & ~nd.binary_erosion(body, iterations=6))
+    half = lambda m: m.reshape(224, 2, 224, 2).mean((1, 3)) > 0.5
+    # mảng tối trong hào quang (khe giữa các mũi tóc) lộ ra thành vệt đen khi tóc cử động: bỏ
+    return {"aura": half(fg & ~core & (mx > 0.3)), "hair": half(hair), "body": half(body)}
+
+
+def _trace(img):
+    with tempfile.TemporaryDirectory() as tmp:
+        src, out = pathlib.Path(tmp, "l.png"), pathlib.Path(tmp, "l.svg")
+        img.save(src)
+        subprocess.run(["uv", "run", "--quiet", "--python", "3.12", "--with", "vtracer", "python", "-c",
+                        "import sys,vtracer;vtracer.convert_image_to_svg_py(sys.argv[1],sys.argv[2],colormode='color',hierarchical='cutout',mode='spline',"
+                        "filter_speckle=4,color_precision=6,layer_difference=12,corner_threshold=60,length_threshold=4.0,splice_threshold=45,path_precision=1)",
+                        str(src), str(out)], check=True)
+        paths = re.findall(r"<path[^>]*/>", out.read_text())
+
+    def keyed(p):
+        c = re.search(r'fill="#([0-9A-Fa-f]{6})"', p)
+        if c is None:
+            return False
+        r, g, b = (int(c.group(1)[i:i + 2], 16) for i in (0, 2, 4))
+        return r - g > 30 and b - g > 30  # vtracer trộn màu đánh dấu với viền: mọi tông tím hồng đều là nó
+    return "".join(p for p in paths if not keyed(p))
+
+
+def layers(level):
+    """Path vector từng lớp (viewBox 0 0 224 224), để con pet cử động từng bộ phận."""
+    rgb = np.asarray(Image.open(HERE / f"art/mascot/claude-{level}.png").convert("RGB").resize((224, 224), Image.LANCZOS))
+    out = {}
+    for name, m in split(level).items():
+        img = np.where(m[..., None], rgb, np.array(KEY, dtype=np.uint8))
+        out[name] = _trace(Image.fromarray(img.astype(np.uint8)))
+    return out
+
+
 _PATHS = {}
 
 
@@ -91,8 +154,8 @@ scenes = {"dragonball": scene(), **{f"dragonball-{lv}": scene(lv) for lv in LEVE
 for k, v in scenes.items():
     assert len(v) < 131072, (k, len(v))
 (HERE / "hooks/scenes.ts").write_text("// Sinh bởi make_scenes.py, đừng sửa tay\n"
-                                      "// SCENES: cảnh nền app; MASCOTS: path vector của Claude mỗi mức (viewBox 0 0 256 256), cho con pet cạnh ô chat\n"
+                                      "// SCENES: cảnh nền app; MASCOTS: path vector của Claude mỗi mức tách lớp aura / hair / body (viewBox 0 0 224 224), cho con pet cạnh ô chat\n"
                                       "export const SCENES: Record<string, string> = " + json.dumps(scenes) + "\n"
-                                      "export const MASCOTS: Record<string, string> = " + json.dumps({lv: mascot(lv) for lv in LEVELS}) + "\n"
+                                      "export const MASCOTS: Record<string, { aura: string; hair: string; body: string }> = " + json.dumps({lv: layers(lv) for lv in LEVELS}) + "\n"
                                       "export const AURA: Record<string, string> = " + json.dumps(AURA) + "\n")
 print({k: len(v) for k, v in scenes.items()})
