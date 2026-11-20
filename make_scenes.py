@@ -64,9 +64,20 @@ def mascot(level):
     return _PATHS[level]
 
 
+def no_outline(paths):
+    # nền: bỏ viền đen dày quanh mascot (nhìn bẩn khi mờ), giữ mảng tối nhỏ như mắt
+    def keep(p):
+        c = re.search(r'fill="#([0-9A-Fa-f]{6})"', p)
+        if c is None or sum(int(c.group(1)[i:i + 2], 16) for i in (0, 2, 4)) >= 3 * 70:
+            return True
+        nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", re.search(r' d="([^"]*)"', p).group(1))]
+        return max(nums[0::2]) - min(nums[0::2]) < 40 and max(nums[1::2]) - min(nums[1::2]) < 40
+    return "".join(p for p in re.findall(r"<path[^>]*/>", paths) if keep(p))
+
+
 def scene(level=None):
     color = AURA.get(level, "#D97757")
-    body = (f'<svg x="1150" y="640" width="340" height="340" viewBox="0 0 224 224" opacity=".45">{mascot(level)}</svg>' if level else
+    body = (f'<svg x="1150" y="640" width="340" height="340" viewBox="0 0 224 224" opacity=".55">{no_outline(mascot(level))}</svg>' if level else
             '<text x="1330" y="850" font-size="120" text-anchor="middle" fill="#D97757" opacity=".18">✳</text>')
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">'
             f'<style>{CSS} {STILL}</style><defs>'
