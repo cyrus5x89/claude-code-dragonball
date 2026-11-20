@@ -171,7 +171,7 @@ export const register: Register = on => {
     // app tự bọc dải này trong một thẻ xám và cắt phần tràn ra ngoài, nên con Claude nằm gọn trong thẻ, dồn sát phải
     return (
       <Box flexDirection="row" justifyContent="flex-end">
-        <Svg isInteractive key={now} width={317} height={90} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
+        <Svg isInteractive key={now} width={634} height={180} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
       </Box>
     )
   })
