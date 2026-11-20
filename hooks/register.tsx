@@ -144,17 +144,18 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // góc phải dòng dưới ô chat (cạnh nhãn chế độ "Auto"): Claude nhỏ, chưởng bắn sang trái
-  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
-    if (e.surface !== 'desktop') return next(e)
+  // Claude nhỏ ở mép phải ngay trên ô chat (chưởng bắn sang trái). App không vẽ cây của plugin ở dòng dưới ô chat
+  // (chỗ SessionMode) khi không có nhãn chế độ nào, nên dùng dải AbovePrompt và dồn sang phải.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.surface !== 'desktop' || e.props.hasSurvey) return next(e)
     const mode = await $.store.get(MODE_KEY)
+    if (mode === 'off') return next(e)
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
     const now = await read($, pose)
-    const { Box, Svg, Text } = $.ui.resolve(e)
+    const { Box, Svg } = $.ui.resolve(e)
     return (
-      <Box>
-        {e.props.modes.length > 0 && <Text dimColor>{e.props.modes.join(' & ')} </Text>}
-        <Svg isInteractive key={now} width={114} height={29} alt={`Claude ${now === 'idle' ? 'resting' : now === 'charge' ? 'charging ki' : 'firing a beam'}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
+      <Box flexDirection="row" justifyContent="flex-end">
+        <Svg isInteractive key={now} width={152} height={38} alt={`Claude ${now === 'idle' ? 'resting' : now === 'charge' ? 'charging ki' : 'firing a beam'}`} source={petSvg(shownLevel, now, await fpsOf($), true)} />
       </Box>
     )
   })
@@ -178,6 +179,7 @@ export const register: Register = on => {
     }
     if (word === '') await $.store.delete(MODE_KEY)
     else await $.store.set(MODE_KEY, word)
+    shown = undefined
     const set = await setScene($, sceneFor(word || undefined))
     const said = word === '' ? 'Dragon-ball backdrop follows the effort level.' : `Dragon-ball backdrop pinned to ${word}.`
     return { text: set.isDrawn ? said : `${said} This window may not draw backdrops yet.` }
