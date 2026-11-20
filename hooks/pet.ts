@@ -5,7 +5,7 @@
 //   punch  dùng công cụ (đọc, chạy lệnh, tìm): đấm hai phát, nổ va chạm · blast  ghi/sửa file: gom chưởng rồi bắn
 // Một dải SVG có CSS animation (Svg isInteractive mới chạy animation).
 // fps: 60 mượt (giữ easing), 24 / 12 nhảy theo khung hình bằng steps() để đỡ tốn máy.
-import { AURA, FX, MASCOTS } from './scenes'
+import { AURA, FX, KI, MASCOTS } from './scenes'
 
 import type { Pose } from '../types'
 export type { Pose }
@@ -58,8 +58,10 @@ function css(pose: Pose, fps: number): string {
         `.hair{${ROOT};animation:${a('rise', 0.45, 'cubic-bezier(.34,1.56,.64,1)', 'both')},${a('tremble', 0.08, 'linear', '.45s infinite')}}` +
         '@keyframes rise{from{transform:translateY(0) scale(1)}to{transform:translateY(-4px) scale(1.03,1.1)}}' +
         '@keyframes tremble{0%,100%{rotate:0deg}50%{rotate:1.2deg}}' +
-        `.ki{${FEET};animation:${a('surge', 0.16, 'ease-in-out', 'infinite alternate')}}` +
-        '@keyframes surge{from{transform:scale(1.02,1.04);opacity:.85}to{transform:scale(1.08,1.16);opacity:1}}' +
+        // hào quang bung ra từ sau lưng (bật quá đà rồi về), sau đó cháy phập phồng liên hồi, gốc ở chân
+        `.ki2{transform-origin:112px 190px;animation:${a('kiIn', 0.45, 'cubic-bezier(.34,1.56,.64,1)', 'both')},${a('kiBurn', 0.18, 'ease-in-out', '.45s infinite alternate')}}` +
+        '@keyframes kiIn{from{transform:scale(.4);opacity:0}to{transform:scale(1.15,1.2);opacity:1}}' +
+        '@keyframes kiBurn{from{scale:1 1}to{scale:1.04 1.09}}' +
         `.arc{opacity:0;animation:${a('zap', 0.5, 'linear', 'infinite')}}` +
         `.bolt{opacity:0;animation:${a('zap', 0.7, 'linear', 'infinite')}}` +
         '@keyframes zap{0%,9%{opacity:0}10%,16%{opacity:1}17%,100%{opacity:0}}' +
@@ -90,8 +92,8 @@ function css(pose: Pose, fps: number): string {
         // lúc bắn: tóc hất ngược và dựng, hào quang phồng to rồi xẹp dần
         `.hair{${ROOT};animation:${a('blow', t, 'ease-out', 'both')}}` +
         '@keyframes blow{0%{transform:scale(1)}28%{transform:translateY(-3px) scale(1.04,1.1)}34%{transform:rotate(-8deg) translate(-4px,-3px) scale(1.04,1.12)}75%{transform:rotate(-5deg) translate(-3px,-2px) scale(1.03,1.08)}100%{transform:none}}' +
-        `.ki{${FEET};animation:${a('boom', t, 'ease-out', 'both')}}` +
-        '@keyframes boom{0%{transform:scale(1)}28%{transform:scale(1.1,1.16)}36%{transform:scale(1.18,1.24)}75%{transform:scale(1.08,1.12)}100%{transform:scale(1)}}' +
+        `.ki2{transform-origin:112px 190px;animation:${a('boom', t, 'ease-out', 'both')}}` +
+        '@keyframes boom{0%{transform:scale(1.15,1.2)}28%{transform:scale(1.25,1.32)}36%{transform:scale(1.35,1.42)}75%{transform:scale(1.2,1.26)}100%{transform:scale(1,1);opacity:.6}}' +
         `.arc{opacity:0;animation:${a('zap', 0.3, 'linear', 'infinite')}}` +
         '@keyframes zap{0%,9%{opacity:0}10%,25%{opacity:1}26%,100%{opacity:0}}'
     }
@@ -169,8 +171,13 @@ export function petSvg(level: string, pose: Pose, fps = 24, flip = false, x0 = 0
       return sp(FX.sleep[f], flip ? 380 - 60 - w : 60, 0, h, 'z', `animation-delay:-${d}s;opacity:0`)
     }).join('')
     : ''
+  // gồng ki và bắn chưởng: thay viền hào quang có sẵn bằng hào quang vẽ riêng (art/fx/aura-*.png), bung to sau lưng
+  const powered = pose === 'charge' || pose === 'blast'
+  const ki = powered
+    ? `<g class="ki2"><svg width="224" height="224" viewBox="0 0 160 160" overflow="visible">${KI[level] ?? KI.low}</svg></g>`
+    : `<g class="ki">${m.aura}</g>`
   const me = `<g class="me"><svg x="4" y="14" width="72" height="72" viewBox="0 0 224 224" overflow="visible">` +
-    `<g class="ki">${m.aura}</g><g class="hair">${m.hair}</g><g class="bod">${m.body}</g></svg></g>`
+    `${ki}<g class="hair">${m.hair}</g><g class="bod">${m.body}</g></svg></g>`
   // Zzz không lật để chữ đọc xuôi: đặt ngoài nhóm lật
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} -20 ${380 - x0} 106" width="${380 - x0}" height="106"><style>${css(pose, fps)}${extra} ${STILL}</style><defs>` +
     `<radialGradient id="glow"><stop offset="0" stop-color="${color}" stop-opacity=".9"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient></defs>` +

@@ -34,7 +34,7 @@ Then send any message: the backdrop and the pet appear with the first turn.
 ![Poses](docs/poses.png)
 
 - **idle**: breathing; after 90 s idle it falls asleep (head down, Zzz, a sleep bubble)
-- **charge** while Claude works: dust bursts at its feet, hair stands up and trembles, the aura surges, lightning from medium up, rocks lift off the ground
+- **charge** while Claude works: dust bursts at its feet, a full ki aura (drawn per level, `art/fx/aura-*.png`) bursts out behind it and keeps burning, hair stands up and trembles, lightning from medium up, rocks lift off the ground
 - **punch** on each read, search or command: two jabs, each a four-frame impact (spark, star, burst, smoke ring), the hair whips back
 - **blast** on each Write / Edit: gathers ki, then fires a beam across the bar
 

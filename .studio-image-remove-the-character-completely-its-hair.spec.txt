@@ -1,0 +1,4 @@
+Use case: precise-object-edit
+Primary request: Remove the character completely: its hair, orange body, face, eyes and black ink outline. Keep only the surrounding aura: the flame-like ki aura ring with its sparkles, same shape, size and position. Where the character was, fill with solid flat pure magenta #FF00FF, and replace the whole dark background outside the aura with solid flat pure magenta #FF00FF too. Keep the aura crisp cel-shaded with flat colour bands and a thin dark outline, no soft blur. Recolour the aura to pale gold, thinner and smaller than a full power-up.
+Input images: Image 1: edit target
+Constraints: change only the named object; keep surrounding texture, lighting and everything else unchanged

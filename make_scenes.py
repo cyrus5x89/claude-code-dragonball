@@ -205,5 +205,8 @@ for k, v in scenes.items():
                                       "export const FX: Record<string, { w: number; h: number; d: string }[]> = "
                                       + json.dumps({"bolts": fx_sprites("bolts", 90), "impact": fx_sprites("impact", 90, grid=(2, 2)),
                                                     "beam": fx_sprites("beam", [90, 260], grid=(2, 1)), "debris": fx_sprites("debris", 40),
-                                                    "sleep": fx_sprites("sleep", 60)}) + "\n")
+                                                    "sleep": fx_sprites("sleep", 60)}) + "\n"
+                                      "// KI: hào quang gồng ki riêng từng mức (art/fx/aura-*.png), cùng khung với mascot (viewBox 0 0 160 160); bỏ nét viền tối: vtracer tô kín cả lòng vòng viền thành mảng đen\n"
+                                      "export const KI: Record<string, string> = "
+                                      + json.dumps({lv: no_outline(_trace(Image.open(HERE / f"art/fx/aura-{lv}.png").convert("RGB").resize((160, 160), Image.LANCZOS))) for lv in LEVELS}) + "\n")
 print({k: len(v) for k, v in scenes.items()})
