@@ -5,9 +5,11 @@ import json, math, pathlib, re, subprocess, tempfile
 HERE = pathlib.Path(__file__).parent
 LEVELS = ["low", "medium", "high", "xhigh", "max", "ultracode"]
 AURA = {"low": "#F2C230", "medium": "#C98A0B", "high": "#FFD84D", "xhigh": "#E0384F", "max": "#2FA8F0", "ultracode": "#D8DEE9"}
+# tâm cụm ngọc + mascot trên khung 1600x1000: lệch phải, trên ô nhập
+CX, CY = 1290, 600
 STILL = "@media (prefers-reduced-motion: reduce) { * { animation: none !important } }"
 CSS = (".ball{animation:pulse 6s ease-in-out infinite alternate}"
-       ".aura{transform-origin:1330px 800px;animation:breathe 9s ease-in-out infinite alternate}"
+       ".aura{transform-box:fill-box;transform-origin:center;animation:breathe 9s ease-in-out infinite alternate}"
        "@keyframes pulse{from{opacity:.55}to{opacity:1}}@keyframes breathe{from{transform:scale(.94);opacity:.7}to{transform:scale(1.06);opacity:1}}")
 
 
@@ -55,7 +57,7 @@ def scene(level=None):
             '<radialGradient id="orb" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#FFE29A"/><stop offset=".55" stop-color="#F5A623"/><stop offset="1" stop-color="#B85C00"/></radialGradient>'
             f'<radialGradient id="glow"><stop offset="0" stop-color="{color}" stop-opacity=".22"/><stop offset="1" stop-color="{color}" stop-opacity="0"/></radialGradient>'
             '</defs><rect width="1600" height="1000" fill="#0E0E0E"/>'
-            f'<ellipse class="aura" cx="1330" cy="800" rx="420" ry="360" fill="url(#glow)"/>{body}{balls()}</svg>')
+            f'<g transform="translate({CX - 0.65 * 1330:.0f} {CY - 0.65 * 800:.0f}) scale(.65)"><ellipse class="aura" cx="1330" cy="800" rx="420" ry="360" fill="url(#glow)"/>{body}{balls()}</g></svg>')
 
 
 scenes = {"dragonball": scene(), **{f"dragonball-{lv}": scene(lv) for lv in LEVELS}}
