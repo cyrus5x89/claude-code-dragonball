@@ -3,3 +3,5 @@
 .studio-image-*
 images/
 node_modules/
+tsconfig.json
+.claude-plugin/types/
