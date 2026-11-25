@@ -58,7 +58,7 @@ No pet and no backdrop in the terminal: the plugin gives the CLI its colour them
 
 To try it from a clone without installing: `claude --plugin-dir ./claude-code-dragonball`.
 
-**Colours per level.** The plugin ships one terminal theme per level in `themes/` (Claude Code names them `custom:dragonball:dragonball-<level>`, in `/theme` as "Claude Dragonball <level>"), plus the base orange one, `custom:dragonball:dragonball`. `/dragonball <level>` sets the level's theme in `~/.claude/settings.json`; `/dragonball` and `/dragonball off` go back to the base theme when a level theme is on, and leave any other theme alone. Following the effort level changes only the app's colours, never the terminal theme. `python3 make_scenes.py --themes` rebuilds the level themes from `themes/dragonball.json` and the aura colours.
+**Colours per level.** The plugin ships one terminal theme per level in `themes/` (Claude Code names them `custom:dragonball:dragonball-<level>`, in `/theme` as "Claude Dragonball <level>"), plus the base orange one, `custom:dragonball:dragonball`. `/dragonball <level>` sets the level's theme in `~/.claude/settings.json` and remembers the theme you had; `/dragonball` and `/dragonball off` put that theme back when a level theme is on, and leave any theme you picked since alone. A level theme that is not installed is reported, not written. Following the effort level changes only the app's colours, never the terminal theme. `python3 make_scenes.py` rebuilds the scenes and the level themes together (`--themes`: only the themes) from `themes/dragonball.json` and the aura colours.
 
 | Level | Accent (`claude`) |
 |---|---|
@@ -77,7 +77,8 @@ For the iTerm2 IDE layout (preview pane, Saiyan watermark per effort level) see 
 
 | | |
 |---|---|
-| `themes/dragonball-<level>.json` | The same theme with the level's aura colour in place of Claude orange, tinting the greys |
+| `themes/dragonball-<level>.json` | The same theme with the level's aura colour in place of Claude orange, tinting the greys; a cue that would match the accent (permission, plan mode, fast mode, ultra effort, auto-accept, warning) moves to orange |
+| `hooks/levels.test.ts` | `claude plugin test`: level themes, going back to your own theme, a theme not installed, the app refusing a palette |
 | `themes/dragonball.json` | Theme (dark base): orange Claude accent, gold shimmer, yellow permission prompts, blue plan mode, red fast mode, white ultra effort, soft green/red diff tints, matching subagent colours |
 | `spinnerVerbs` | Power-up verbs replace the built-in ones |
 | `spinnerTipsOverride` | Tips labelled ❶ |

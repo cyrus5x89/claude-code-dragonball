@@ -18,6 +18,8 @@ const GLASS = { blur: 10, tint: '#0E0E0E', opacity: 0.35 }
 const CLI_THEME = 'custom:dragonball:dragonball'
 // $.store: 'off' tắt hẳn, một mức effort là giữ cố định, không có là đi theo effort
 const MODE_KEY = 'mode'
+// $.store: theme terminal người dùng đang dùng trước khi /dragonball <mức> thay nó, để /dragonball (off) trả lại đúng cái đó
+const BEFORE_KEY = 'theme-before'
 
 type Answer = { isDrawn: boolean }
 type AnyEngine = {
@@ -59,13 +61,15 @@ function mix(a: string, b: string, t: number): string {
   return '#' + x.map((v, i) => Math.round(v + (y[i]! - v) * t).toString(16).padStart(2, '0')).join('')
 }
 
-// bảng màu app của mỗi cảnh: màu nhấn = màu hào quang của mức (cảnh gốc: cam Claude), nền đen ám chút màu ấy; chỉ chế độ tối
+// bảng màu app của mỗi cảnh: màu nhấn = màu hào quang của mức (cảnh gốc: cam Claude), nền đen ám chút màu ấy; chỉ chế độ tối.
+// makeColors kê độ tương phản trong problems: dòng "Desktop won't paint this theme" là app bỏ cả theme, nên khi có dòng đó
+// thì không gửi colors (chỉ đặt nền); các dòng khác dưới chuẩn riêng của design system nhưng app vẫn vẽ (look.md).
 const palettes = new Map<string, unknown>()
 function colorsFor(scene: string): unknown {
-  let colors = palettes.get(scene)
-  if (colors === undefined) {
+  if (palettes.has(scene)) return palettes.get(scene)
+  {
     const c = AURA[scene.replace(/^dragonball-?/, '')] ?? '#D97757'
-    colors = makeColors({
+    const made = makeColors({
       label: 'Claude Dragonball', only: 'dark',
       roles: { accent: c, danger: '#E06C5A', success: '#9DB57A', warning: '#F2C230', pro: '#C792B8' },
       dark: { gray: { anchors: {
@@ -73,10 +77,11 @@ function colorsFor(scene: string): unknown {
         'surface-3': mix('#232120', c, 0.07), 'text-primary': '#E8E6E3', 'text-secondary': mix('#C9C4BE', c, 0.08),
         'text-muted': mix('#A39C94', c, 0.1),
       } } },
-    }).theme
-    palettes.set(scene, colors)
+    })
+    const refused = made.problems.some((p: string) => p.startsWith("Desktop won't paint"))
+    palettes.set(scene, refused ? undefined : made.theme)
   }
-  return colors
+  return palettes.get(scene)
 }
 
 function isMissing(error: unknown): boolean {
@@ -86,14 +91,17 @@ function isMissing(error: unknown): boolean {
 async function setScene($: AnyEngine, scene: string): Promise<Answer> {
   if (shown === scene) return { isDrawn: true }
   const look = { backdrop: { scene, id: scene, glass: GLASS }, overrideColorScheme: 'dark' }
-  try {
-    const set = await $.theme!.set({ ...look, colors: colorsFor(scene) })
-    shown = scene
-    return set
-  } catch (error) {
-    if (!isMissing(error)) throw error
+  const colors = colorsFor(scene)
+  if (colors !== undefined) {
+    try {
+      const set = await $.theme!.set({ ...look, colors })
+      shown = scene
+      return set
+    } catch {
+      // colors là phần thêm: engine cũ không biết nó, hoặc app từ chối bảng màu, thì vẫn đặt nền như trước
+    }
   }
-  // engine cũ chưa nhận colors: chỉ đặt nền
+  // chỉ đặt nền
   try {
     const set = await $.theme!.set(look)
     shown = scene
@@ -137,20 +145,37 @@ function sceneFor(level: unknown): string {
 }
 
 type Themed = {
-  settings: { read(args: { key: 'theme' }): Promise<unknown> }
-  config: { set(args: { key: string; value: string }): Promise<{ deny?: string }> }
+  store: { get(key: string): Promise<unknown>; set(key: string, value: string): Promise<unknown>; delete(key: string): Promise<unknown> }
+  config: {
+    list(): Promise<readonly { key: string; value: unknown; options?: readonly string[] }[]>
+    set(args: { key: string; value: string }): Promise<{ deny?: string }>
+  }
 }
 
-// Theme terminal (settings.json "theme", chung cho CLI và app): /dragonball <mức> chọn theme của mức đó; /dragonball
-// và /dragonball off trả về theme gốc, nhưng chỉ khi đang dùng theme của một mức (theme người dùng tự chọn thì để nguyên).
+// Theme terminal (hàng "theme" của /config, chung cho CLI và app): /dragonball <mức> chọn theme của mức đó và nhớ theme
+// đang dùng trước đó; /dragonball và /dragonball off trả lại đúng theme ấy, nhưng chỉ khi đang dùng theme của một mức
+// (theme người dùng tự chọn sau đó thì để nguyên). Theme của mức chưa có trong danh sách theme thì báo, không ghi bừa.
 async function setCliTheme($: Themed, level: string | undefined): Promise<string> {
-  const want = level === undefined ? CLI_THEME : `${CLI_THEME}-${level}`
   try {
-    const now = await $.settings.read({ key: 'theme' })
-    if (now === want) return ''
-    if (level === undefined && !(typeof now === 'string' && now.startsWith(`${CLI_THEME}-`))) return ''
-    const { deny } = await $.config.set({ key: 'theme', value: want })
-    return deny === undefined ? ` Theme: ${want}.` : ` Theme not changed: ${deny}`
+    const row = (await $.config.list()).find(r => r.key === 'theme')
+    if (row === undefined) return ''
+    const now = row.value
+    const onLevel = typeof now === 'string' && now.startsWith(`${CLI_THEME}-`)
+    let target: string
+    if (level === undefined) {
+      if (!onLevel) return ''
+      const before = await $.store.get(BEFORE_KEY)
+      target = typeof before === 'string' ? before : CLI_THEME
+    } else {
+      target = `${CLI_THEME}-${level}`
+      if (now === target) return ''
+      if (row.options !== undefined && !row.options.includes(target)) return ` Theme not changed: ${target} is not an installed theme.`
+      if (!onLevel && typeof now === 'string') await $.store.set(BEFORE_KEY, now)
+    }
+    const { deny } = await $.config.set({ key: 'theme', value: target })
+    if (deny !== undefined) return ` Theme not changed: ${deny}`
+    if (level === undefined) await $.store.delete(BEFORE_KEY)
+    return ` Theme: ${target}.`
   } catch (error) {
     return ` Theme not changed: ${String(error)}`
   }

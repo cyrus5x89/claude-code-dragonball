@@ -1,10 +1,6 @@
 # hooks/scenes.ts: cảnh nền Claude Dragonball cho app desktop (mod), một cảnh gốc + một cảnh mỗi mức effort
-# python3 make_scenes.py · python3 make_scenes.py --themes: chỉ sinh themes/dragonball-<mức>.json
+# python3 make_scenes.py: cảnh + theme terminal · python3 make_scenes.py --themes: chỉ sinh themes/dragonball-<mức>.json
 import json, math, pathlib, re, subprocess, sys, tempfile
-
-import numpy as np
-from PIL import Image
-from scipy import ndimage as nd
 
 HERE = pathlib.Path(__file__).parent
 LEVELS = ["low", "medium", "high", "xhigh", "max", "ultracode"]
@@ -199,12 +195,24 @@ def mix(a, b, t):
     return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(a, b))
 
 
-if "--themes" in sys.argv:
+# dấu hiệu có nghĩa riêng (xin quyền, plan mode, fast mode...): trùng hay gần màu nhấn của mức thì đổi sang màu này
+CUES = {"permission": "#D97757", "permissionShimmer": "#E8A387", "planMode": "#D97757", "autoAccept": "#D97757",
+        "fastMode": "#D97757", "effortUltra": "#D97757", "warning": "#E8913A"}
+
+
+def near(a, b, limit=48):
+    """Hai màu hex cách nhau dưới limit (khoảng cách RGB): nhìn như một."""
+    return math.dist(*[tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) for c in (a, b)]) < limit
+
+
+def write_themes():
     # themes/dragonball-<mức>.json: theme terminal của từng mức (/dragonball <mức> chọn nó), lấy theme gốc rồi thay màu
-    # cam Claude bằng màu hào quang của mức đó và ám màu ấy vào các nền xám
+    # cam Claude bằng màu hào quang của mức đó, ám màu ấy vào các nền xám, và dời dấu hiệu nào trùng màu nhấn sang màu khác.
+    # Màu riêng của subagent (*_FOR_SUBAGENTS_ONLY) giữ nguyên: đó là tên màu của từng subagent.
     base = json.loads((HERE / "themes/dragonball.json").read_text())
     for lv in LEVELS:
         c, o = AURA[lv], dict(base["overrides"])
+        o.update({k: v for k, v in CUES.items() if near(o[k], c)})
         o.update({
             "claude": c, "claudeShimmer": mix(c, "#FFFFFF", .35), "suggestion": c, "remember": c, "briefLabelClaude": c,
             "rate_limit_fill": c, "promptBorder": mix("#2A2624", c, .35), "promptBorderShimmer": c,
@@ -215,7 +223,15 @@ if "--themes" in sys.argv:
         })
         out = {"name": f"Claude Dragonball {lv}", "base": base["base"], "overrides": o}
         (HERE / f"themes/dragonball-{lv}.json").write_text(json.dumps(out, indent=2) + "\n")
+
+
+if "--themes" in sys.argv:
+    write_themes()
     sys.exit()
+
+import numpy as np  # noqa: E402  (chỉ phần cảnh cần bộ xử lý ảnh; --themes chạy không cần)
+from PIL import Image  # noqa: E402
+from scipy import ndimage as nd  # noqa: E402
 
 scenes = {"dragonball": scene(), **{f"dragonball-{lv}": scene(lv) for lv in LEVELS}}
 for k, v in scenes.items():
@@ -233,4 +249,5 @@ for k, v in scenes.items():
                                       "// KI: hào quang gồng ki riêng từng mức (art/fx/aura-*.png), cùng khung với mascot (viewBox 0 0 160 160); bỏ nét viền tối: vtracer tô kín cả lòng vòng viền thành mảng đen\n"
                                       "export const KI: Record<string, string> = "
                                       + json.dumps({lv: no_outline(_trace(Image.open(HERE / f"art/fx/aura-{lv}.png").convert("RGB").resize((160, 160), Image.LANCZOS))) for lv in LEVELS}) + "\n")
+write_themes()
 print({k: len(v) for k, v in scenes.items()})
