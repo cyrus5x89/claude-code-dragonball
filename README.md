@@ -6,8 +6,6 @@ A theme pack for Claude Code: black with Claude orange, dragon-ball gold accents
 
 ## Claude desktop app
 
-![Backdrop in the desktop app](docs/app.png)
-
 The plugin is a mod for the Code tab, built like Anthropic's `theme-examples` plugin: a black backdrop with seven dragon balls and Claude powering up behind the chat, following the effort level of each turn (low → ultracode), and so do the app's colours: the accent takes the colour of that level's aura and tints the black.
 
 **Install** (type these in the app's prompt box):
