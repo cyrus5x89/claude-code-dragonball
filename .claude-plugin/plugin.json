@@ -5,6 +5,5 @@
   "author": {
     "name": "cyrus5x89"
   },
-  "license": "MIT",
-  "types": "./types/index.d.ts"
+  "license": "MIT"
 }

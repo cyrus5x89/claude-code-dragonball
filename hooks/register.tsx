@@ -2,11 +2,9 @@
 // /dragonball: bật lại theo effort · /dragonball fps 12|24|60: tốc độ khung hình · /dragonball <low|medium|high|xhigh|max|ultracode>: giữ một mức,
 // đổi luôn bảng màu (app: colors của theme; terminal: theme themes/dragonball-<mức>.json) · /dragonball off: tắt.
 // Cách đặt nền theo plugin mẫu theme-examples của Anthropic: thử theme.set (mới) rồi ui.backdrop (cũ), engine thiếu thì thôi.
-import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import { BLAST_MS, FPS, PUNCH_MS, petSvg, sceneAtFps } from './pet'
-import type { Pose } from '../types'
+import { FPS, sceneAtFps } from './fps'
 import { makeColors } from './make-colors.js'
 import { AURA, SCENES } from './scenes'
 
@@ -27,23 +25,9 @@ type AnyEngine = {
   ui: { toast(text: string): unknown; backdrop?(args: unknown): Promise<Answer> }
 }
 
-// con pet cạnh ô chat: dáng (thở / ngủ / gồng ki / đấm / bắn chưởng) và mức effort để chọn con Claude nào
-const pose = atom({ plugin: 'dragonball', key: 'pose' } as const, 'idle' as Pose)
-const level = atom({ plugin: 'dragonball', key: 'level' } as const, 'low')
-// công cụ ghi file: xong một cái là bắn chưởng
-const WRITES = ['Write', 'Edit', 'MultiEdit', 'NotebookEdit']
-// nghỉ quá lâu thì ngủ
-const SLEEP_AFTER_MS = 90_000
-// mỗi lần nghỉ một số mới: hẹn giờ ngủ của lần nghỉ cũ thấy số khác thì thôi
-let restId = 0
-const ALT: Record<string, string> = {
-  idle: 'resting', sleep: 'asleep', charge: 'charging ki', punch: 'punching', blast: 'firing a beam',
-}
 // $.store 'fps': 12 / 24 / 60 khung hình mỗi giây cho mọi animation, mặc định 24
 const FPS_KEY = 'fps'
-// con pet ở mép phải (mặc định, chưởng bắn sang trái) hay mép trái (lật lại, chưởng bắn sang phải)
-const SIDE_KEY = 'side'
-// /dragonball app off: tắt nền và con pet trên app desktop của máy này, theme terminal vẫn giữ
+// /dragonball app off: tắt nền và bảng màu trên app desktop của máy này, theme terminal vẫn giữ
 const APP_KEY = 'app'
 const DEFAULT_FPS = 24
 
@@ -62,7 +46,7 @@ function followScene(mode: unknown): string {
   return sceneFor(typeof mode === 'string' ? mode : lastEffort)
 }
 
-// AbovePrompt và Backdrop đọc $.store, mà ghi store không làm vẽ lại: bảo engine vẽ lại ngay (engine cũ không có hay lỗi thì thôi)
+// hook Backdrop đọc fps và APP_KEY từ $.store, mà ghi store không làm vẽ lại: bảo engine vẽ lại ngay (engine cũ không có hay lỗi thì thôi)
 function redraw($: { ui: { invalidate(event: 'ui.render'): void } }): void {
   try {
     $.ui.invalidate('ui.render')
@@ -150,7 +134,7 @@ async function clearScene($: AnyEngine): Promise<void> {
   }
 }
 
-// Nền, bảng màu app và con pet chỉ có trên app desktop. Một phiên CLI (terminal) cũng chạy plugin này: nếu nó đặt cảnh,
+// Nền và bảng màu app chỉ có trên app desktop. Một phiên CLI (terminal) cũng chạy plugin này: nếu nó đặt cảnh,
 // nền của app đổi theo effort của phiên CLI. Nên chỉ phiên đang vẽ trên app mới đặt cảnh.
 async function inApp($: { session: { surfaces(): Promise<readonly string[]> }; store: { get(key: string): Promise<unknown> } }): Promise<boolean> {
   return (await $.session.surfaces()).includes('desktop') && (await $.store.get(APP_KEY)) !== 'off'
@@ -200,7 +184,7 @@ async function setCliTheme($: Themed, level: string | undefined): Promise<string
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     try {
-      await $.command.register({ name: COMMAND, description: 'Dragon-ball backdrop + pet: off, a level to pin, nothing to follow effort, or fps 12|24|60.' })
+      await $.command.register({ name: COMMAND, description: 'Dragon-ball backdrop: off, a level to pin, nothing to follow effort, app off|on, or fps 12|24|60.' })
     } catch (error) {
       void $.ui.toast(`dragonball: /${COMMAND} is not available (${String(error)})`)
     }
@@ -231,10 +215,8 @@ export const register: Register = on => {
 
   // đầu mỗi lượt đặt lại cảnh: app bỏ qua cảnh đặt trước khi cửa sổ gắn vào phiên (phiên mới, sau /clear)
   on('prompt.submit', async ($, e, next) => {
-    // hook này chặn được lượt gửi: lỗi của nền / pet không được làm hỏng tin nhắn
+    // hook này chặn được lượt gửi: lỗi của nền không được làm hỏng tin nhắn
     await (async () => {
-      restId += 1
-      await update($, pose, () => 'charge')
       const mode = await $.store.get(MODE_KEY)
       if (mode === 'off' || !await inApp($)) return
       shown = undefined
@@ -245,10 +227,7 @@ export const register: Register = on => {
 
   // mỗi lần gửi model một yêu cầu: đổi cảnh theo effort của lượt, trừ khi đã tắt hoặc giữ một mức
   on('turn.step', async function* ($, e, next) {
-    if (typeof e.effort === 'string') {
-      lastEffort = e.effort
-      await update($, level, () => e.effort as string)
-    }
+    if (typeof e.effort === 'string') lastEffort = e.effort
     const mode = await $.store.get(MODE_KEY)
     if (mode === undefined && await inApp($)) {
       try {
@@ -260,50 +239,6 @@ export const register: Register = on => {
     return yield* next(e)
   })
 
-  // ghi/sửa file: bắn chưởng; công cụ khác (đọc, chạy lệnh, tìm...): đấm hai phát; xong thì về gồng ki
-  on('tool.call', async ($, e, next) => {
-    const result = await next(e)
-    // chỉ là hoạt hình: lỗi ở đây không được đổi kết quả của công cụ
-    await (async () => {
-      const hit: Pose = WRITES.includes(e.tool) ? 'blast' : 'punch'
-      if (hit === 'punch' && await read($, pose) === 'blast') return  // đang bắn chưởng thì không cắt ngang
-      await update($, pose, () => hit)
-      void $.clock.sleep(hit === 'blast' ? BLAST_MS : PUNCH_MS)
-        .then(() => update($, pose, now => (now === hit ? 'charge' : now)))
-        .catch(() => undefined)
-    })().catch(() => undefined)
-    return result
-  })
-
-  on('turn.complete', async ($, e, next) => {
-    await update($, pose, () => 'idle')
-    const mine = ++restId
-    void (async () => {
-      await $.clock.sleep(SLEEP_AFTER_MS)
-      if (mine === restId) await update($, pose, now => (now === 'idle' ? 'sleep' : now))
-    })()
-    return next(e)
-  })
-
-  // Claude nhỏ ở mép phải ngay trên ô chat (chưởng bắn sang trái). App không vẽ cây của plugin ở dòng dưới ô chat
-  // (chỗ SessionMode) khi không có nhãn chế độ nào, nên dùng dải AbovePrompt và dồn sang phải.
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || e.surface !== 'desktop') return next(e)
-    const mode = await $.store.get(MODE_KEY)
-    if (mode === 'off') return next(e)
-    const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
-    const now = await read($, pose)
-    const left = (await $.store.get(SIDE_KEY)) === 'left'
-    if ((await $.store.get(APP_KEY)) === 'off') return next(e)
-    const { Box, Svg } = $.ui.resolve(e)
-    // app tự bọc dải này trong một thẻ xám rộng bằng ô chat và cắt phần tràn ra ngoài (lề âm hay khung hẹp đều bị cắt), nên giữ khung đầy đủ, dồn phải
-    return (
-      <Box flexDirection="row" justifyContent={left ? 'flex-start' : 'flex-end'}>
-        <Svg isInteractive key={now} width={634} height={177} alt={`Claude ${ALT[now]}`} source={petSvg(shownLevel, now, await fpsOf($), !left)} />
-      </Box>
-    )
-  })
-
   on('command.run', { command: COMMAND }, async ($, e) => {
     const word = e.args.trim().toLowerCase()
     const fps = /^fps\s+(\d+)$/.exec(word)
@@ -313,11 +248,6 @@ export const register: Register = on => {
       await $.store.set(FPS_KEY, n)
       redraw($)
       return { text: `Dragon-ball animations at ${n} fps.` }
-    }
-    if (word === 'left' || word === 'right') {
-      await $.store.set(SIDE_KEY, word)
-      redraw($)
-      return { text: `Pet on the ${word} in the desktop app.` }
     }
     if (word === 'app off' || word === 'app on') {
       // cài đặt theo máy: các phiên khác đọc được ngay nhưng chỉ vẽ lại ở tin nhắn sau của chúng
@@ -334,38 +264,36 @@ export const register: Register = on => {
             failed = ` The backdrop could not be cleared: ${String(error)}`
           }
         }
-        return { text: `Desktop app: backdrop and pet off on this machine; the terminal theme stays. /dragonball app on brings them back.${others}${failed}` }
+        return { text: `Desktop app: backdrop off on this machine; the terminal theme stays. /dragonball app on brings them back.${others}${failed}` }
       }
       await $.store.delete(APP_KEY)
       redraw($)
       const mode = await $.store.get(MODE_KEY)
-      if (mode === 'off') return { text: 'Desktop app: on again, but the backdrop and pet stay off until /dragonball or /dragonball <level>.' }
-      if (!await inApp($)) return { text: `Desktop app: backdrop and pet back on.${others}` }
+      if (mode === 'off') return { text: 'Desktop app: on again, but the backdrop stays off until /dragonball or /dragonball <level>.' }
+      if (!await inApp($)) return { text: `Desktop app: backdrop back on.${others}` }
       // vẽ lại ngay nền + bảng màu app, không đợi lượt sau (cảnh đã nhớ có thể cũ: app off từ phiên khác)
       shown = undefined
       try {
         const set = await setScene($, followScene(mode))
-        return { text: (set.isDrawn ? 'Desktop app: backdrop and pet back on.' : 'Desktop app: back on. This window may not draw backdrops yet.') + others }
+        return { text: (set.isDrawn ? 'Desktop app: backdrop back on.' : 'Desktop app: back on. This window may not draw backdrops yet.') + others }
       } catch (error) {
         return { text: `Desktop app: back on, but the backdrop failed: ${String(error)}.${others}` }
       }
     }
     if (word === 'off') {
       await $.store.set(MODE_KEY, 'off')
-      redraw($)
       if (await inApp($)) await clearScene($)
       return { text: `Dragon-ball backdrop off. /dragonball turns it back on.${await setCliTheme($, undefined)}` }
     }
     if (word !== '' && !LEVELS.includes(word)) {
-      return { text: `Unknown "${word}". Use off, left, right, app off|on, fps 12|24|60, nothing, or one of: ${LEVELS.join(', ')}.` }
+      return { text: `Unknown "${word}". Use off, app off|on, fps 12|24|60, nothing, or one of: ${LEVELS.join(', ')}.` }
     }
     if (word === '') await $.store.delete(MODE_KEY)
     else await $.store.set(MODE_KEY, word)
-    redraw($)
     const theme = await setCliTheme($, word || undefined)
     if (!await inApp($)) {
       const appOff = (await $.session.surfaces()).includes('desktop') && (await $.store.get(APP_KEY)) === 'off'
-      return { text: (appOff ? 'Saved. The desktop app is off on this machine: /dragonball app on shows the backdrop and pet.' : 'Saved. The backdrop and pet show in the Claude desktop app.') + theme }
+      return { text: (appOff ? 'Saved. The desktop app is off on this machine: /dragonball app on shows the backdrop.' : 'Saved. The backdrop show in the Claude desktop app.') + theme }
     }
     shown = undefined
     const set = await setScene($, followScene(word || undefined))

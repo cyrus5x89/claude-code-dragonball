@@ -81,7 +81,7 @@ async function turnAt($: any, effort: string) {
   await stream
 }
 
-test('app on draws the pinned level again at once and redraws the pet', async ($, on) => {
+test('app on draws the pinned level again at once', async ($, on) => {
   const s = wire(on, 'dark-ansi', THEMES, 'desktop')
   await $.command.run({ command: 'dragonball', args: 'max' })
   const r0 = s.redraws
@@ -120,14 +120,14 @@ test('each new message keeps the level of the last turn instead of flashing the 
   expect(s.scenes.slice(before).every(x => x === 'dragonball-max')).toBe(true)
 })
 
-test('app on with the backdrop off draws nothing and says both stay off', async ($, on) => {
+test('app on with the backdrop off draws nothing and says so', async ($, on) => {
   const s = wire(on, 'dark-ansi', THEMES, 'desktop')
   await $.command.run({ command: 'dragonball', args: 'off' })
   await $.command.run({ command: 'dragonball', args: 'app off' })
   const before = s.scenes.length
   const r = await $.command.run({ command: 'dragonball', args: 'app on' })
   expect(s.scenes.length).toBe(before)
-  expect(String(r.text)).toContain('backdrop and pet stay off')
+  expect(String(r.text)).toContain('backdrop stays off')
 })
 
 test('app on redraws even when this session remembers the scene (app off came from the terminal)', async ($, on) => {
@@ -160,11 +160,19 @@ test('a level pinned while the app is off says how to turn it on', async ($, on)
   expect(String(r.text)).toContain('/dragonball app on')
 })
 
-test('fps, side, off and a level redraw the pet at once', async ($, on) => {
+test('fps redraws the backdrop at once', async ($, on) => {
   const s = wire(on, 'dark-ansi', THEMES, 'desktop')
-  for (const args of ['fps 12', 'left', 'right', 'max', '', 'off']) {
+  for (const args of ['fps 12', 'fps 60']) {
     const before = s.redraws
     await $.command.run({ command: 'dragonball', args })
     expect(s.redraws).toBeGreaterThan(before)
+  }
+})
+
+test('the pet is gone: left and right are unknown words', async ($, on) => {
+  wire(on, 'dark-ansi', THEMES, 'desktop')
+  for (const args of ['left', 'right']) {
+    const r = await $.command.run({ command: 'dragonball', args })
+    expect(String(r.text)).toContain(`Unknown "${args}"`)
   }
 })
