@@ -1,9 +1,9 @@
 # hooks/scenes.ts: cảnh nền Claude Dragonball cho app desktop (mod), một cảnh gốc + một cảnh mỗi mức effort
-# python3 make_scenes.py
+# python3 make_scenes.py · python3 make_scenes.py --themes: chỉ sinh themes/dragonball-<mức>.json
 import json, math, pathlib, re, subprocess, sys, tempfile
 
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 from scipy import ndimage as nd
 
 HERE = pathlib.Path(__file__).parent
@@ -193,15 +193,28 @@ def scene(level=None):
             f'<g transform="translate({CX - 0.65 * 1330:.0f} {CY - 0.65 * 800:.0f}) scale(.65)"><ellipse class="aura" cx="1330" cy="800" rx="420" ry="360" fill="url(#glow)"/>{body}{balls()}</g></svg>')
 
 
-if "--frames" in sys.argv:
-    # khung PNG của pet CLI (make_cli_frames.ts) nén về bảng 256 màu có alpha: nhẹ hơn nhiều, nhìn như cũ
-    for f in sorted((HERE / "frames").rglob("*.png")):
-        if f.name.startswith("l"):
-            continue
-        im = Image.open(f).convert("RGBA")
-        im.quantize(256, method=Image.Quantize.FASTOCTREE).save(f, optimize=True)
-        # bản soi gương cho /dragonball left: con pet ở mép trái, chưởng bắn sang phải
-        ImageOps.mirror(im).quantize(256, method=Image.Quantize.FASTOCTREE).save(f.with_name("l" + f.name), optimize=True)
+def mix(a, b, t):
+    """Màu hex a pha t phần màu b (0..1)."""
+    a, b = (tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) for c in (a, b))
+    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(a, b))
+
+
+if "--themes" in sys.argv:
+    # themes/dragonball-<mức>.json: theme terminal của từng mức (/dragonball <mức> chọn nó), lấy theme gốc rồi thay màu
+    # cam Claude bằng màu hào quang của mức đó và ám màu ấy vào các nền xám
+    base = json.loads((HERE / "themes/dragonball.json").read_text())
+    for lv in LEVELS:
+        c, o = AURA[lv], dict(base["overrides"])
+        o.update({
+            "claude": c, "claudeShimmer": mix(c, "#FFFFFF", .35), "suggestion": c, "remember": c, "briefLabelClaude": c,
+            "rate_limit_fill": c, "promptBorder": mix("#2A2624", c, .35), "promptBorderShimmer": c,
+            "subtle": mix(o["subtle"], c, .12), "inactive": mix(o["inactive"], c, .1),
+            "userMessageBackground": mix(o["userMessageBackground"], c, .08),
+            "bashMessageBackgroundColor": mix(o["bashMessageBackgroundColor"], c, .06),
+            "rate_limit_empty": mix(o["rate_limit_empty"], c, .1),
+        })
+        out = {"name": f"Claude Dragonball {lv}", "base": base["base"], "overrides": o}
+        (HERE / f"themes/dragonball-{lv}.json").write_text(json.dumps(out, indent=2) + "\n")
     sys.exit()
 
 scenes = {"dragonball": scene(), **{f"dragonball-{lv}": scene(lv) for lv in LEVELS}}

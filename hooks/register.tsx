@@ -1,18 +1,21 @@
 // Claude Dragonball cho app desktop: cảnh nền đen, 7 viên ngọc rồng, Claude biến hình theo mức effort của lượt.
-// /dragonball: bật lại theo effort · /dragonball fps 12|24|60: tốc độ khung hình · /dragonball <low|medium|high|xhigh|max|ultracode>: giữ một mức · /dragonball off: tắt.
+// /dragonball: bật lại theo effort · /dragonball fps 12|24|60: tốc độ khung hình · /dragonball <low|medium|high|xhigh|max|ultracode>: giữ một mức,
+// đổi luôn bảng màu (app: colors của theme; terminal: theme themes/dragonball-<mức>.json) · /dragonball off: tắt.
 // Cách đặt nền theo plugin mẫu theme-examples của Anthropic: thử theme.set (mới) rồi ui.backdrop (cũ), engine thiếu thì thôi.
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import { BLAST_MS, FPS, PUNCH_MS, petSvg, sceneAtFps } from './pet'
 import type { Pose } from '../types'
-import { FRAME_FPS, FRAMES } from './frames'
-import { SCENES } from './scenes'
+import { makeColors } from './make-colors.js'
+import { AURA, SCENES } from './scenes'
 
 const PLUGIN = 'dragonball'
 const COMMAND = 'dragonball'
 const LEVELS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']
 const GLASS = { blur: 10, tint: '#0E0E0E', opacity: 0.35 }
+// theme terminal của plugin (themes/*.json): Claude Code gọi chúng là custom:<plugin>:<tên file>
+const CLI_THEME = 'custom:dragonball:dragonball'
 // $.store: 'off' tắt hẳn, một mức effort là giữ cố định, không có là đi theo effort
 const MODE_KEY = 'mode'
 
@@ -38,7 +41,7 @@ const ALT: Record<string, string> = {
 const FPS_KEY = 'fps'
 // con pet ở mép phải (mặc định, chưởng bắn sang trái) hay mép trái (lật lại, chưởng bắn sang phải)
 const SIDE_KEY = 'side'
-// /dragonball app off: tắt nền và con pet trên app desktop của máy này, CLI vẫn chạy
+// /dragonball app off: tắt nền và con pet trên app desktop của máy này, theme terminal vẫn giữ
 const APP_KEY = 'app'
 const DEFAULT_FPS = 24
 
@@ -50,14 +53,49 @@ async function fpsOf($: { store: { get(key: string): Promise<unknown> } }): Prom
 // cảnh đang hiện; biến của module, nạp lại thì đặt lại từ đầu
 let shown: string | undefined
 
+function mix(a: string, b: string, t: number): string {
+  const rgb = (c: string) => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16))
+  const x = rgb(a), y = rgb(b)
+  return '#' + x.map((v, i) => Math.round(v + (y[i]! - v) * t).toString(16).padStart(2, '0')).join('')
+}
+
+// bảng màu app của mỗi cảnh: màu nhấn = màu hào quang của mức (cảnh gốc: cam Claude), nền đen ám chút màu ấy; chỉ chế độ tối
+const palettes = new Map<string, unknown>()
+function colorsFor(scene: string): unknown {
+  let colors = palettes.get(scene)
+  if (colors === undefined) {
+    const c = AURA[scene.replace(/^dragonball-?/, '')] ?? '#D97757'
+    colors = makeColors({
+      label: 'Claude Dragonball', only: 'dark',
+      roles: { accent: c, danger: '#E06C5A', success: '#9DB57A', warning: '#F2C230', pro: '#C792B8' },
+      dark: { gray: { anchors: {
+        'surface-0': mix('#0E0E0E', c, 0.03), 'surface-1': mix('#161514', c, 0.05), 'surface-2': mix('#1C1A19', c, 0.06),
+        'surface-3': mix('#232120', c, 0.07), 'text-primary': '#E8E6E3', 'text-secondary': mix('#C9C4BE', c, 0.08),
+        'text-muted': mix('#A39C94', c, 0.1),
+      } } },
+    }).theme
+    palettes.set(scene, colors)
+  }
+  return colors
+}
+
 function isMissing(error: unknown): boolean {
   return error instanceof TypeError || (error instanceof Error && error.message.includes('does not know the attribute'))
 }
 
 async function setScene($: AnyEngine, scene: string): Promise<Answer> {
   if (shown === scene) return { isDrawn: true }
+  const look = { backdrop: { scene, id: scene, glass: GLASS }, overrideColorScheme: 'dark' }
   try {
-    const set = await $.theme!.set({ backdrop: { scene, id: scene, glass: GLASS }, overrideColorScheme: 'dark' })
+    const set = await $.theme!.set({ ...look, colors: colorsFor(scene) })
+    shown = scene
+    return set
+  } catch (error) {
+    if (!isMissing(error)) throw error
+  }
+  // engine cũ chưa nhận colors: chỉ đặt nền
+  try {
+    const set = await $.theme!.set(look)
     shown = scene
     return set
   } catch (error) {
@@ -88,58 +126,34 @@ async function clearScene($: AnyEngine): Promise<void> {
   }
 }
 
-// Nền chỉ có trên app desktop. Một phiên CLI (terminal) cũng chạy plugin này: nếu nó đặt cảnh, nền của app đổi theo
-// effort của phiên CLI. Nên chỉ phiên đang vẽ trên app mới đặt cảnh; dáng con pet là của riêng từng phiên, chạy ở cả hai.
+// Nền, bảng màu app và con pet chỉ có trên app desktop. Một phiên CLI (terminal) cũng chạy plugin này: nếu nó đặt cảnh,
+// nền của app đổi theo effort của phiên CLI. Nên chỉ phiên đang vẽ trên app mới đặt cảnh.
 async function inApp($: { session: { surfaces(): Promise<readonly string[]> }; store: { get(key: string): Promise<unknown> } }): Promise<boolean> {
   return (await $.session.surfaces()).includes('desktop') && (await $.store.get(APP_KEY)) !== 'off'
 }
 
-// con pet CLI: cỡ ô (cột x hàng) theo đúng tỉ lệ ảnh (ô chữ iTerm2 cao ~2.8 lần rộng) để ảnh lấp kín ô, chân con Claude
-// chạm đáy dải. Khung hẹp quanh con Claude, khung rộng lúc bắn chưởng.
-const CLI_ROWS = 6
-const CLI_NARROW = 20
-const CLI_WIDE = 60
-// ảnh đang gắn trên dải và số khung đã chạy; một bộ đếm giờ cho cả phiên, chỉ đổi khung khi có ảnh
-type Band = { requestId: string; key: string; level: string; pose: Pose; root: string; tick: number; left: boolean }
-let band: Band | undefined
-let ticking = false
-
-// iTerm2 chỉ nhận ảnh dạng byte PNG (kitty / Ghostty mới đọc được đường dẫn file), nên đọc file một lần rồi giữ base64
-const pngs = new Map<string, string>()
-type Fs = { fs: { read(path: string, options: { as: 'bytes' }): Promise<{ base64: string }> } }
-
-async function frameSource($: Fs, b: Band, tick: number): Promise<{ png: string }> {
-  const f = FRAMES[b.pose] ?? { intro: 1, loop: 0, wide: false }
-  // mở đầu chạy một lần, rồi lặp đoạn loop; không có loop thì giữ khung cuối
-  const i = tick < f.intro || f.loop === 0 ? Math.min(tick, f.intro - 1) : f.intro + (tick - f.intro) % f.loop
-  const path = `${b.root}/frames/${b.level}/${b.pose}/${b.left ? 'l' : ''}${i}.png`
-  let png = pngs.get(path)
-  if (png === undefined) {
-    png = (await $.fs.read(path, { as: 'bytes' })).base64
-    pngs.set(path, png)
-  }
-  return { png }
-}
-
-function startTicker($: Fs & { clock: { every(ms: number, fn: () => void): { cancel(): void } }; ui: { blit(args: never): Promise<{ deny?: string }> } }): void {
-  if (ticking) return
-  ticking = true
-  const timer = $.clock.every(Math.round(1000 / FRAME_FPS), () => {
-    const b = band
-    if (b === undefined) return
-    b.tick += 1
-    void frameSource($, b, b.tick)
-      .then(source => $.ui.blit({ requestId: b.requestId, key: b.key, source } as never))
-      .then(r => {
-        // terminal không hiện được ảnh (đang vẽ chữ alt thay): thôi đổi khung cho đỡ tốn máy
-        if (r.deny !== undefined && band === b) { timer.cancel(); ticking = false; band = undefined }
-      })
-      .catch(() => undefined)
-  })
-}
-
 function sceneFor(level: unknown): string {
   return typeof level === 'string' && LEVELS.includes(level) ? `dragonball-${level}` : 'dragonball'
+}
+
+type Themed = {
+  settings: { read(args: { key: 'theme' }): Promise<unknown> }
+  config: { set(args: { key: string; value: string }): Promise<{ deny?: string }> }
+}
+
+// Theme terminal (settings.json "theme", chung cho CLI và app): /dragonball <mức> chọn theme của mức đó; /dragonball
+// và /dragonball off trả về theme gốc, nhưng chỉ khi đang dùng theme của một mức (theme người dùng tự chọn thì để nguyên).
+async function setCliTheme($: Themed, level: string | undefined): Promise<string> {
+  const want = level === undefined ? CLI_THEME : `${CLI_THEME}-${level}`
+  try {
+    const now = await $.settings.read({ key: 'theme' })
+    if (now === want) return ''
+    if (level === undefined && !(typeof now === 'string' && now.startsWith(`${CLI_THEME}-`))) return ''
+    const { deny } = await $.config.set({ key: 'theme', value: want })
+    return deny === undefined ? ` Theme: ${want}.` : ` Theme not changed: ${deny}`
+  } catch (error) {
+    return ` Theme not changed: ${String(error)}`
+  }
 }
 
 export const register: Register = on => {
@@ -230,25 +244,12 @@ export const register: Register = on => {
   // Claude nhỏ ở mép phải ngay trên ô chat (chưởng bắn sang trái). App không vẽ cây của plugin ở dòng dưới ô chat
   // (chỗ SessionMode) khi không có nhãn chế độ nào, nên dùng dải AbovePrompt và dồn sang phải.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || (e.surface !== 'desktop' && e.surface !== 'terminal')) return next(e)
+    if (e.props.hasSurvey || e.surface !== 'desktop') return next(e)
     const mode = await $.store.get(MODE_KEY)
     if (mode === 'off') return next(e)
     const shownLevel = typeof mode === 'string' && LEVELS.includes(mode) ? mode : await read($, level)
     const now = await read($, pose)
     const left = (await $.store.get(SIDE_KEY)) === 'left'
-    if (e.surface === 'terminal') {
-      // terminal không vẽ SVG: ảnh PNG dựng sẵn (make_cli_frames.mts), đổi khung bằng $.ui.blit theo nhịp FRAME_FPS
-      const { Box, Image } = $.ui.resolve(e)
-      const wide = FRAMES[now]?.wide ?? false
-      const key = `pet-${now}`
-      band = { requestId: e.requestId, key, level: shownLevel, pose: now, root: $.plugin.root, tick: 0, left }
-      startTicker($)
-      return (
-        <Box flexDirection="row" justifyContent={left ? 'flex-start' : 'flex-end'}>
-          <Image key={key} source={await frameSource($, band, 0)} columns={wide ? CLI_WIDE : CLI_NARROW} rows={CLI_ROWS} alt={`Claude ${ALT[now]}`} />
-        </Box>
-      )
-    }
     if ((await $.store.get(APP_KEY)) === 'off') return next(e)
     const { Box, Svg } = $.ui.resolve(e)
     // app tự bọc dải này trong một thẻ xám rộng bằng ô chat và cắt phần tràn ra ngoài (lề âm hay khung hẹp đều bị cắt), nên giữ khung đầy đủ, dồn phải
@@ -270,29 +271,30 @@ export const register: Register = on => {
     }
     if (word === 'left' || word === 'right') {
       await $.store.set(SIDE_KEY, word)
-      return { text: `Pet on the ${word}; it moves on the next turn.` }
+      return { text: `Pet on the ${word} in the desktop app; it moves on the next turn.` }
     }
     if (word === 'app off' || word === 'app on') {
       if (word === 'app off' && await inApp($)) await clearScene($)
       if (word === 'app off') await $.store.set(APP_KEY, 'off')
       else await $.store.delete(APP_KEY)
-      return { text: word === 'app off' ? 'Desktop app: backdrop and pet off on this machine; the CLI pet stays. /dragonball app on brings them back.' : 'Desktop app: backdrop and pet back on.' }
+      return { text: word === 'app off' ? 'Desktop app: backdrop and pet off on this machine; the terminal theme stays. /dragonball app on brings them back.' : 'Desktop app: backdrop and pet back on.' }
     }
     if (word === 'off') {
       await $.store.set(MODE_KEY, 'off')
       if (await inApp($)) await clearScene($)
-      return { text: 'Dragon-ball backdrop off. /dragonball turns it back on.' }
+      return { text: `Dragon-ball backdrop off. /dragonball turns it back on.${await setCliTheme($, undefined)}` }
     }
     if (word !== '' && !LEVELS.includes(word)) {
       return { text: `Unknown "${word}". Use off, left, right, app off|on, fps 12|24|60, nothing, or one of: ${LEVELS.join(', ')}.` }
     }
     if (word === '') await $.store.delete(MODE_KEY)
     else await $.store.set(MODE_KEY, word)
-    if (!await inApp($)) return { text: 'Saved. The backdrop shows in the Claude desktop app; the pet follows it here.' }
+    const theme = await setCliTheme($, word || undefined)
+    if (!await inApp($)) return { text: `Saved. The backdrop and pet show in the Claude desktop app.${theme}` }
     shown = undefined
     const set = await setScene($, sceneFor(word || undefined))
-    const said = word === '' ? 'Dragon-ball backdrop follows the effort level.' : `Dragon-ball backdrop pinned to ${word}.`
-    return { text: set.isDrawn ? said : `${said} This window may not draw backdrops yet.` }
+    const said = word === '' ? 'Dragon-ball backdrop follows the effort level.' : `Dragon-ball backdrop and colours pinned to ${word}.`
+    return { text: (set.isDrawn ? said : `${said} This window may not draw backdrops yet.`) + theme }
   })
 
   on('ui.render', { component: 'Backdrop' }, async ($, e, next) => {
