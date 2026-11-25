@@ -54,6 +54,22 @@ async function fpsOf($: { store: { get(key: string): Promise<unknown> } }): Prom
 
 // cảnh đang hiện; biến của module, nạp lại thì đặt lại từ đầu
 let shown: string | undefined
+// mức effort của lượt gần nhất mà turn.step thấy (biến của module như trên); chưa có lượt nào thì dùng cảnh gốc
+let lastEffort: string | undefined
+
+// cảnh khi đi theo effort: mức đang giữ, hoặc mức của lượt gần nhất, hoặc cảnh gốc khi chưa có lượt nào
+function followScene(mode: unknown): string {
+  return sceneFor(typeof mode === 'string' ? mode : lastEffort)
+}
+
+// AbovePrompt và Backdrop đọc $.store, mà ghi store không làm vẽ lại: bảo engine vẽ lại ngay (engine cũ không có hay lỗi thì thôi)
+function redraw($: { ui: { invalidate(event: 'ui.render'): void } }): void {
+  try {
+    $.ui.invalidate('ui.render')
+  } catch {
+    // chỉ là vẽ lại sớm: cài đặt đã ghi, lượt sau vẫn vẽ lại
+  }
+}
 
 function mix(a: string, b: string, t: number): string {
   const rgb = (c: string) => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16))
@@ -191,7 +207,7 @@ export const register: Register = on => {
     const mode = await $.store.get(MODE_KEY)
     if (mode !== 'off' && await inApp($)) {
       try {
-        await setScene($, sceneFor(mode))
+        await setScene($, followScene(mode))
       } catch {
         // nền là phần phụ: lỗi không được chặn phiên
       }
@@ -205,7 +221,7 @@ export const register: Register = on => {
     if (mode !== 'off' && (await $.store.get(APP_KEY)) !== 'off') {
       shown = undefined
       try {
-        await setScene($, sceneFor(mode))
+        await setScene($, followScene(mode))
       } catch {
         // như trên
       }
@@ -222,14 +238,17 @@ export const register: Register = on => {
       const mode = await $.store.get(MODE_KEY)
       if (mode === 'off' || !await inApp($)) return
       shown = undefined
-      await setScene($, sceneFor(mode))
+      await setScene($, followScene(mode))
     })().catch(() => undefined)
     return next(e)
   })
 
   // mỗi lần gửi model một yêu cầu: đổi cảnh theo effort của lượt, trừ khi đã tắt hoặc giữ một mức
   on('turn.step', async function* ($, e, next) {
-    if (typeof e.effort === 'string') await update($, level, () => e.effort as string)
+    if (typeof e.effort === 'string') {
+      lastEffort = e.effort
+      await update($, level, () => e.effort as string)
+    }
     const mode = await $.store.get(MODE_KEY)
     if (mode === undefined && await inApp($)) {
       try {
@@ -292,20 +311,48 @@ export const register: Register = on => {
       const n = Number(fps[1])
       if (!FPS.includes(n)) return { text: `fps is one of ${FPS.join(', ')}.` }
       await $.store.set(FPS_KEY, n)
+      redraw($)
       return { text: `Dragon-ball animations at ${n} fps.` }
     }
     if (word === 'left' || word === 'right') {
       await $.store.set(SIDE_KEY, word)
-      return { text: `Pet on the ${word} in the desktop app; it moves on the next turn.` }
+      redraw($)
+      return { text: `Pet on the ${word} in the desktop app.` }
     }
     if (word === 'app off' || word === 'app on') {
-      if (word === 'app off' && await inApp($)) await clearScene($)
-      if (word === 'app off') await $.store.set(APP_KEY, 'off')
-      else await $.store.delete(APP_KEY)
-      return { text: word === 'app off' ? 'Desktop app: backdrop and pet off on this machine; the terminal theme stays. /dragonball app on brings them back.' : 'Desktop app: backdrop and pet back on.' }
+      // cài đặt theo máy: các phiên khác đọc được ngay nhưng chỉ vẽ lại ở tin nhắn sau của chúng
+      const others = ' Other open windows follow on their next message.'
+      if (word === 'app off') {
+        // ghi cài đặt trước, để lỗi khi xoá nền không làm mất nó
+        await $.store.set(APP_KEY, 'off')
+        redraw($)
+        let failed = ''
+        if ((await $.session.surfaces()).includes('desktop')) {
+          try {
+            await clearScene($)
+          } catch (error) {
+            failed = ` The backdrop could not be cleared: ${String(error)}`
+          }
+        }
+        return { text: `Desktop app: backdrop and pet off on this machine; the terminal theme stays. /dragonball app on brings them back.${others}${failed}` }
+      }
+      await $.store.delete(APP_KEY)
+      redraw($)
+      const mode = await $.store.get(MODE_KEY)
+      if (mode === 'off') return { text: 'Desktop app: on again, but the backdrop and pet stay off until /dragonball or /dragonball <level>.' }
+      if (!await inApp($)) return { text: `Desktop app: backdrop and pet back on.${others}` }
+      // vẽ lại ngay nền + bảng màu app, không đợi lượt sau (cảnh đã nhớ có thể cũ: app off từ phiên khác)
+      shown = undefined
+      try {
+        const set = await setScene($, followScene(mode))
+        return { text: (set.isDrawn ? 'Desktop app: backdrop and pet back on.' : 'Desktop app: back on. This window may not draw backdrops yet.') + others }
+      } catch (error) {
+        return { text: `Desktop app: back on, but the backdrop failed: ${String(error)}.${others}` }
+      }
     }
     if (word === 'off') {
       await $.store.set(MODE_KEY, 'off')
+      redraw($)
       if (await inApp($)) await clearScene($)
       return { text: `Dragon-ball backdrop off. /dragonball turns it back on.${await setCliTheme($, undefined)}` }
     }
@@ -314,10 +361,14 @@ export const register: Register = on => {
     }
     if (word === '') await $.store.delete(MODE_KEY)
     else await $.store.set(MODE_KEY, word)
+    redraw($)
     const theme = await setCliTheme($, word || undefined)
-    if (!await inApp($)) return { text: `Saved. The backdrop and pet show in the Claude desktop app.${theme}` }
+    if (!await inApp($)) {
+      const appOff = (await $.session.surfaces()).includes('desktop') && (await $.store.get(APP_KEY)) === 'off'
+      return { text: (appOff ? 'Saved. The desktop app is off on this machine: /dragonball app on shows the backdrop and pet.' : 'Saved. The backdrop and pet show in the Claude desktop app.') + theme }
+    }
     shown = undefined
-    const set = await setScene($, sceneFor(word || undefined))
+    const set = await setScene($, followScene(word || undefined))
     const said = word === '' ? 'Dragon-ball backdrop follows the effort level.' : `Dragon-ball backdrop and colours pinned to ${word}.`
     return { text: (set.isDrawn ? said : `${said} This window may not draw backdrops yet.`) + theme }
   })

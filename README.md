@@ -27,7 +27,7 @@ Then send any message: the backdrop and the pet appear with the first turn.
 - `/dragonball` follows the effort level (default)
 - `/dragonball max` pins one level (`low`, `medium`, `high`, `xhigh`, `max`, `ultracode`): its backdrop, its pet and its colours, in the app and in the terminal theme (see "Colours per level" under [CLI](#cli-terminal))
 - `/dragonball off` turns the backdrop and the pet off
-- `/dragonball app off` / `app on`: turn the desktop-app backdrop and pet off on this machine and keep the terminal theme
+- `/dragonball app off` / `app on`: turn the desktop-app backdrop and pet off on this machine and keep the terminal theme; the window you type in updates at once, other open windows on their next message
 - `/dragonball left` / `right` (default): which edge the pet sits on; on the left it faces right and fires the Kamehameha rightward
 - `/dragonball fps 12`, `24` (default) or `60`: frame rate of every animation; lower costs less GPU
 
@@ -78,7 +78,7 @@ For the iTerm2 IDE layout (preview pane, Saiyan watermark per effort level) see 
 | | |
 |---|---|
 | `themes/dragonball-<level>.json` | The same theme with the level's aura colour in place of Claude orange, tinting the greys; a cue that would match the accent (permission, plan mode, fast mode, ultra effort, auto-accept, warning) moves to orange |
-| `hooks/levels.test.ts` | `claude plugin test`: level themes, going back to your own theme, a theme not installed, the app refusing a palette |
+| `hooks/levels.test.ts` | `claude plugin test`: level themes, going back to your own theme, a theme not installed, the app refusing a palette, `app off` / `app on` (scene drawn, pet redrawn at once, backdrop off, a refused clear), following effort without flashing the base scene |
 | `themes/dragonball.json` | Theme (dark base): orange Claude accent, gold shimmer, yellow permission prompts, blue plan mode, red fast mode, white ultra effort, soft green/red diff tints, matching subagent colours |
 | `spinnerVerbs` | Power-up verbs replace the built-in ones |
 | `spinnerTipsOverride` | Tips labelled ❶ |
