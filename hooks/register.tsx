@@ -147,14 +147,14 @@ function sceneFor(level: unknown): string {
 type Themed = {
   store: { get(key: string): Promise<unknown>; set(key: string, value: string): Promise<unknown>; delete(key: string): Promise<unknown> }
   config: {
-    list(): Promise<readonly { key: string; value: unknown; options?: readonly string[] }[]>
+    list(): Promise<readonly { key: string; value: unknown }[]>
     set(args: { key: string; value: string }): Promise<{ deny?: string }>
   }
 }
 
 // Theme terminal (hàng "theme" của /config, chung cho CLI và app): /dragonball <mức> chọn theme của mức đó và nhớ theme
 // đang dùng trước đó; /dragonball và /dragonball off trả lại đúng theme ấy, nhưng chỉ khi đang dùng theme của một mức
-// (theme người dùng tự chọn sau đó thì để nguyên). Theme của mức chưa có trong danh sách theme thì báo, không ghi bừa.
+// (theme người dùng tự chọn sau đó thì để nguyên). Không so với options của hàng theme: options chỉ liệt kê theme có sẵn (theme custom chọn qua /theme), nên theme của plugin không bao giờ nằm trong đó; config.set từ chối thì báo lý do.
 async function setCliTheme($: Themed, level: string | undefined): Promise<string> {
   try {
     const row = (await $.config.list()).find(r => r.key === 'theme')
@@ -169,11 +169,11 @@ async function setCliTheme($: Themed, level: string | undefined): Promise<string
     } else {
       target = `${CLI_THEME}-${level}`
       if (now === target) return ''
-      if (row.options !== undefined && !row.options.includes(target)) return ` Theme not changed: ${target} is not an installed theme.`
-      if (!onLevel && typeof now === 'string') await $.store.set(BEFORE_KEY, now)
     }
     const { deny } = await $.config.set({ key: 'theme', value: target })
     if (deny !== undefined) return ` Theme not changed: ${deny}`
+    // chỉ nhớ theme cũ khi đã đổi được: lượt bị từ chối không được để lại theme-before
+    if (level !== undefined && !onLevel && typeof now === 'string') await $.store.set(BEFORE_KEY, now)
     if (level === undefined) await $.store.delete(BEFORE_KEY)
     return ` Theme: ${target}.`
   } catch (error) {

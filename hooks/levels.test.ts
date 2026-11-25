@@ -1,17 +1,22 @@
 import { test, expect, mock } from 'claude-code/testing'
 
 const LEVELS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']
-const THEMES = ['dark', 'dark-ansi', 'light', 'custom:dragonball:dragonball', ...LEVELS.map(l => 'custom:dragonball:dragonball-' + l)]
+// hàng theme của /config chỉ liệt kê theme có sẵn, không có theme custom (Claude Code 2.1.332)
+const THEMES = ['dark', 'light', 'dark-daltonized', 'light-daltonized', 'dark-ansi', 'light-ansi']
 
 function wire(on: any, start: string, options: string[] | undefined, surface: string) {
-  const s = { theme: start as unknown, accents: [] as unknown[], scenes: [] as string[], log: [] as string[], surface, redraws: 0, clearFails: false }
+  const s = { theme: start as unknown, accents: [] as unknown[], scenes: [] as string[], log: [] as string[], surface, redraws: 0, clearFails: false, deny: undefined as string | undefined }
   mock.store(on)
   on('session.surfaces' as never, async () => ({ value: [s.surface] }) as never)
   on('turn.step', async function* (_$: unknown, e: any) { return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn', usage: null } as never })
   on('prompt.submit', async (_$: unknown, e: any) => ({ text: e.text }) as never)
   on('ui.invalidate' as never, async () => { s.redraws++; return { value: undefined } as never })
   on('config.list' as never, async () => ({ value: [{ key: 'theme', label: 'Theme', kind: 'choice', value: s.theme, options, isLocked: false }] }) as never)
-  on('config.set', async (_$: unknown, e: any) => { s.theme = e.value; return { value: e.value } as never })
+  on('config.set', async (_$: unknown, e: any) => {
+    if (s.deny !== undefined) return { deny: s.deny } as never
+    s.theme = e.value
+    return { value: e.value } as never
+  })
   on('theme.set' as never, async (_$: unknown, e: any) => { s.accents.push(e.colors === undefined ? 'none' : 'colors'); s.scenes.push(e.backdrop.scene); return { value: { isDrawn: true } } as never })
   on('theme.clear' as never, async () => {
     if (s.clearFails) throw new Error('clear refused')
@@ -52,11 +57,17 @@ test('a theme the user picked after a level stays on /dragonball off', async ($,
   expect(s.theme).toBe('light')
 })
 
-test('a level theme that is not installed is reported, not written', async ($, on) => {
-  const s = wire(on, 'dark-ansi', ['dark', 'dark-ansi'], 'terminal')
+test('config.set refusing the level theme is reported, theme unchanged', async ($, on) => {
+  const s = wire(on, 'dark-ansi', THEMES, 'terminal')
+  s.deny = 'locked by policy'
   const r = await $.command.run({ command: 'dragonball', args: 'max' })
   expect(s.theme).toBe('dark-ansi')
-  expect(String(r.text)).toContain('not an installed theme')
+  expect(String(r.text)).toContain('Theme not changed: locked by policy')
+  // lượt bị từ chối không để lại theme-before: off từ một theme mức về theme gốc của plugin, không về dark-ansi
+  s.deny = undefined
+  s.theme = 'custom:dragonball:dragonball-high'
+  await $.command.run({ command: 'dragonball', args: 'off' })
+  expect(s.theme).toBe('custom:dragonball:dragonball')
 })
 
 test('the app refusing the palette still draws the backdrop', async ($, on) => {

@@ -1,7 +1,7 @@
 {
   "name": "dragonball",
   "description": "Claude Dragonball for Claude Code: a colour theme per effort level for the terminal and the desktop app, and in the desktop app a black backdrop with seven dragon balls and Claude powering up with the effort level",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "author": {
     "name": "cyrus5x89"
   },
